@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">TexForge</string>
+    <string name="nav_create">Create</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+    <string name="coming_soon">Coming soon</string>
+    <string name="btn_take_photo">Take Photo</string>
+    <string name="btn_choose_gallery">Choose from Gallery</string>
+</resources>

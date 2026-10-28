@@ -1,0 +1,6 @@
+{
+  "name": "TexForge",
+  "description": "Turn photos into full PBR texture maps and preview them on a 3D sphere.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
