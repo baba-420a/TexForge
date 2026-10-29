@@ -1,12 +1,12 @@
 package com.example.ui.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.filled.Texture
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Texture
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Screen(
@@ -18,9 +18,10 @@ sealed class Screen(
     data object Create : Screen(
         route = "create",
         title = "Create",
-        selectedIcon = Icons.Filled.AddPhotoAlternate,
-        unselectedIcon = Icons.Outlined.AddPhotoAlternate
+        selectedIcon = Icons.Filled.Texture,
+        unselectedIcon = Icons.Outlined.Texture
     )
+
 
     data object History : Screen(
         route = "history",

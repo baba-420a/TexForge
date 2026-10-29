@@ -2,32 +2,37 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// TexForge Dark Theme Palette (Charcoal, Titanium, Cyan, Amber, Teal)
-val ForgeDarkBg = Color(0xFF0F1216)
-val ForgeDarkSurface = Color(0xFF14171C)
-val ForgeSurfaceContainer = Color(0xFF1A1E24)
-val ForgeSurfaceContainerHigh = Color(0xFF242930)
-val ForgeSurfaceContainerHighest = Color(0xFF2E343E)
-val ForgeSurfaceVariant = Color(0xFF222730)
-val ForgeOutline = Color(0xFF8A929E)
-val ForgeOutlineVariant = Color(0xFF3E4450)
+// TexForge Quiet Precision Dark Theme Palette
+val TexForgeBackground = Color(0xFF0F1115)
+val TexForgeSurface = Color(0xFF171A21)
+val TexForgeSurfaceVariant = Color(0xFF1F232C)
+val TexForgeOutline = Color(0xFF2A2F3A)
+val TexForgeOutlineVariant = Color(0xFF434653)
 
-val ForgeCyanPrimary = Color(0xFF4EBEFF)
-val ForgeCyanOnPrimary = Color(0xFF00344D)
-val ForgeCyanContainer = Color(0xFF004C6D)
-val ForgeCyanOnContainer = Color(0xFFC8E6FF)
+val TexForgeSurfaceContainerLowest = Color(0xFF0C0E12)
+val TexForgeSurfaceContainerLow = Color(0xFF1A1C20)
+val TexForgeSurfaceContainer = Color(0xFF1E2024)
+val TexForgeSurfaceContainerHigh = Color(0xFF282A2E)
+val TexForgeSurfaceContainerHighest = Color(0xFF333539)
 
-val ForgeAmberSecondary = Color(0xFFFFB85C)
-val ForgeAmberOnSecondary = Color(0xFF452B00)
-val ForgeAmberContainer = Color(0xFF633F00)
-val ForgeAmberOnContainer = Color(0xFFFFDDB4)
+val TexForgePrimary = Color(0xFF5B8CFF)
+val TexForgeOnPrimary = Color(0xFF0B1220)
+val TexForgePrimaryContainer = Color(0xFF5B8CFF)
+val TexForgeOnPrimaryContainer = Color(0xFF002665)
 
-val ForgeTealTertiary = Color(0xFF5CE0C2)
-val ForgeTealOnTertiary = Color(0xFF00382E)
-val ForgeTealContainer = Color(0xFF005143)
-val ForgeTealOnContainer = Color(0xFF7DFCDD)
+val TexForgeSecondary = Color(0xFFB5C5F7)
+val TexForgeOnSecondary = Color(0xFF1E2F58)
+val TexForgeSecondaryContainer = Color(0xFF354570)
+val TexForgeOnSecondaryContainer = Color(0xFFA4B4E5)
 
-val ForgeTextPrimary = Color(0xFFE2E4EB)
-val ForgeTextSecondary = Color(0xFFA6ABB6)
-val ForgeError = Color(0xFFFFB4AB)
-val ForgeOnError = Color(0xFF690005)
+val TexForgeTertiary = Color(0xFFFFB874)
+val TexForgeOnTertiary = Color(0xFF4B2800)
+
+val TexForgeOnSurface = Color(0xFFEDEFF3)
+val TexForgeOnSurfaceVariant = Color(0xFF9AA3B2)
+
+val TexForgeSuccess = Color(0xFF3DD68C)
+val TexForgeWarning = Color(0xFFF5B84B)
+val TexForgeError = Color(0xFFFF6B6B)
+val TexForgeOnError = Color(0xFF690005)
+

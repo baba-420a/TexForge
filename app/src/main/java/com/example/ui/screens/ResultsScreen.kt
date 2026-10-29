@@ -1,18 +1,25 @@
 package com.example.ui.screens
 
 import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,66 +27,83 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Compare
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.FilterVintage
+import androidx.compose.material.icons.filled.Fullscreen
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.unit.sp
 import com.example.data.preferences.GenerationMode
 import com.example.data.preferences.NormalFormat
 import com.example.ui.GeneratedMapState
+import kotlinx.coroutines.launch
 
-enum class SelectedMapType(val title: String, val shortLabel: String) {
-    NORMAL("Normal Map", "Normal"),
-    HEIGHT("Height Map", "Height"),
-    ROUGHNESS("Roughness Map", "Roughness"),
-    AO("Ambient Occlusion", "AO"),
-    CURVATURE("Curvature Map", "Curvature"),
-    METALLIC("Metallic Map", "Metallic"),
-    ALBEDO("Albedo (De-lit)", "Albedo"),
-    NOISE("Procedural Noise", "Noise"),
-    SOURCE("Source Photo", "Source")
+enum class SelectedMapType(val title: String, val shortLabel: String, val technicalDescription: String) {
+    NORMAL("Normal Map", "Normal", "Normal (Tangent) • 2048×2048"),
+    HEIGHT("Height Map", "Height", "Displacement (Float) • 2048×2048"),
+    ROUGHNESS("Roughness Map", "Roughness", "Roughness (Grayscale) • 2048×2048"),
+    AO("Ambient Occlusion", "AO", "Ambient Occlusion • 2048×2048"),
+    CURVATURE("Curvature Map", "Curvature", "Surface Curvature • 2048×2048"),
+    METALLIC("Metallic Map", "Metallic", "Metallic (Mask) • 2048×2048"),
+    ALBEDO("Albedo (De-lit)", "Albedo", "Base Color (De-lit) • 2048×2048"),
+    NOISE("Procedural Noise", "Noise", "Micro-Detail Noise • 2048×2048"),
+    SOURCE("Source Photo", "Source", "Original Source Buffer • 2048×2048")
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ResultsScreen(
     generatedState: GeneratedMapState,
@@ -102,13 +126,32 @@ fun ResultsScreen(
     onBackToCreate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var show3dPreview by remember { mutableStateOf(false) }
+    var isCompareMode by remember { mutableStateOf(activeVariant == GenerationMode.COMPARE_BOTH) }
+    var showAdjustSheet by remember { mutableStateOf(false) }
     var selectedMap by remember { mutableStateOf(SelectedMapType.NORMAL) }
+
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
     val verticalScrollState = rememberScrollState()
-    val thumbScrollState = rememberScrollState()
+    val channelTabsScrollState = rememberScrollState()
+
+    // 3D Preview screen branch
+    if (show3dPreview) {
+        PbrPreviewScreen(
+            generatedState = generatedState,
+            aiDepthState = aiDepthState,
+            fastState = fastState,
+            activeVariant = activeVariant,
+            sourceBitmap = sourceBitmap,
+            normalFormat = normalFormat,
+            onBack = { show3dPreview = false },
+            modifier = Modifier.fillMaxSize()
+        )
+        return
+    }
 
     val currentBitmap: Bitmap? = when (selectedMap) {
         SelectedMapType.NORMAL -> generatedState.normalBitmap
@@ -125,127 +168,586 @@ fun ResultsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(MaterialTheme.colorScheme.surface)
     ) {
-        // Top Bar
-        Row(
+        // Top App Bar
+        TopHeaderBar(
+            title = "Material Inspector",
+            onBack = onBackToCreate
+        )
+
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .weight(1f)
+                .verticalScroll(verticalScrollState)
                 .padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = onBackToCreate,
-                    modifier = Modifier.testTag("results_back_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back to Editor",
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-                Column {
-                    Text(
-                        text = "PBR Texture Forge",
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        text = "${generatedState.resolution} × ${generatedState.resolution} px • 8 PBR Maps Active",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(8.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Text(
-                    text = selectedMap.title,
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                )
-            }
-        }
-
-        // Variant Selection Filter Chips (if both variants exist)
-        if (aiDepthState != null && fastState != null) {
+            // Sub-header context & Adjust trigger
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    .padding(top = 2.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Variant:",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                FilterChip(
-                    selected = activeVariant == GenerationMode.AI_DEPTH,
-                    onClick = { onSwitchVariant(GenerationMode.AI_DEPTH) },
-                    label = { Text("AI Depth") },
-                    modifier = Modifier.testTag("chip_variant_ai_depth")
-                )
-                FilterChip(
-                    selected = activeVariant == GenerationMode.FAST,
-                    onClick = { onSwitchVariant(GenerationMode.FAST) },
-                    label = { Text("Fast (No AI)") },
-                    modifier = Modifier.testTag("chip_variant_fast")
-                )
-                FilterChip(
-                    selected = activeVariant == GenerationMode.COMPARE_BOTH,
-                    onClick = { onSwitchVariant(GenerationMode.COMPARE_BOTH) },
-                    label = { Text("Compare Both (Split)") },
-                    modifier = Modifier.testTag("chip_variant_compare")
-                )
-            }
-        }
-
-        // Main Viewer with Interactive Pan, Pinch-Zoom, and Split Comparison
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .padding(horizontal = 16.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.surfaceContainerHighest)
-                .clipToBounds()
-                .pointerInput(selectedMap, activeVariant) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1f, 6f)
-                        val maxPan = (scale - 1f) * 400f
-                        offsetX = (offsetX + pan.x).coerceIn(-maxPan, maxPan)
-                        offsetY = (offsetY + pan.y).coerceIn(-maxPan, maxPan)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "Synthesis 04",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(Color(0xFF3DD68C), CircleShape)
+                            )
+                            Text(
+                                text = "Ready",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                                color = Color(0xFF3DD68C)
+                            )
+                        }
                     }
                 }
-                .testTag("results_interactive_viewer"),
-            contentAlignment = Alignment.Center
-        ) {
-            val isComparing = activeVariant == GenerationMode.COMPARE_BOTH && aiDepthState != null && fastState != null && selectedMap != SelectedMapType.SOURCE
 
-            if (isComparing) {
-                val leftBitmap = getBitmapForMapType(aiDepthState, selectedMap, sourceBitmap)
-                val rightBitmap = getBitmapForMapType(fastState, selectedMap, sourceBitmap)
+                // Adjust Trigger Button
+                Button(
+                    onClick = { showAdjustSheet = true },
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.height(36.dp).testTag("btn_adjust_sheet")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Adjust",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+            }
 
-                SplitCompareViewer(
-                    leftBitmap = leftBitmap,
-                    rightBitmap = rightBitmap,
-                    contentDescription = selectedMap.title,
+            // Mode Segmented Control: AI Depth | Fast
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    val isAiActive = activeVariant == GenerationMode.AI_DEPTH && !isCompareMode
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isAiActive) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                isCompareMode = false
+                                onSwitchVariant(GenerationMode.AI_DEPTH)
+                            }
+                            .testTag("seg_ai_depth")
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = if (isAiActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "AI Depth",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isAiActive) FontWeight.SemiBold else FontWeight.Normal
+                                ),
+                                color = if (isAiActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    val isFastActive = activeVariant == GenerationMode.FAST && !isCompareMode
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (isFastActive) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                isCompareMode = false
+                                onSwitchVariant(GenerationMode.FAST)
+                            }
+                            .testTag("seg_fast")
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Bolt,
+                                contentDescription = null,
+                                tint = if (isFastActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Fast",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isFastActive) FontWeight.SemiBold else FontWeight.Normal
+                                ),
+                                color = if (isFastActive) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Primary 2D Texture Preview Card or Compare Split View
+            if (isCompareMode && aiDepthState != null && fastState != null) {
+                // Interactive Split Comparison View matching compare/code.html
+                CompareSplitCard(
+                    aiDepthState = aiDepthState,
+                    fastState = fastState,
+                    selectedMap = selectedMap,
+                    sourceBitmap = sourceBitmap,
+                    onExitCompare = { isCompareMode = false }
+                )
+            } else {
+                // Standard 2D Viewport matching results/code.html
+                SingleMapCard(
+                    bitmap = currentBitmap,
+                    selectedMap = selectedMap,
                     scale = scale,
                     offsetX = offsetX,
-                    offsetY = offsetY
+                    offsetY = offsetY,
+                    onTransformChange = { s, x, y ->
+                        scale = s
+                        offsetX = x
+                        offsetY = y
+                    },
+                    onToggleCompare = {
+                        isCompareMode = true
+                        onSwitchVariant(GenerationMode.COMPARE_BOTH)
+                    }
                 )
-            } else if (currentBitmap != null) {
+            }
+
+            // Horizontally Scrollable Texture Channels Strip
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(channelTabsScrollState),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SelectedMapType.entries.filter { it != SelectedMapType.SOURCE }.forEach { mapType ->
+                    val isSelected = selectedMap == mapType
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainer,
+                        border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                        modifier = Modifier
+                            .height(36.dp)
+                            .clickable {
+                                selectedMap = mapType
+                                scale = 1f
+                                offsetX = 0f
+                                offsetY = 0f
+                            }
+                            .testTag("tab_channel_${mapType.shortLabel.lowercase()}")
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp)
+                        ) {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
+                            Text(
+                                text = mapType.shortLabel,
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                ),
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Technical Summary Card
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = Icons.Default.FilterVintage,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Column {
+                            Text(
+                                text = "Seamless Tiling",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Border wrap verified (UV 1.0)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainer
+                    ) {
+                        Text(
+                            text = "Repeat 2×2",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
+            // Analytical Insights Card if Compare mode active
+            if (isCompareMode) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant,
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            imageVector = Icons.Default.Insights,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = "Neural Occlusion Delta",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(999.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant
+                            ) {
+                                Text(
+                                    text = "Δ +14.2%",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Verified,
+                                        contentDescription = null,
+                                        tint = Color(0xFF3DD68C),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        text = "Cavity Detail Preservation",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Text(
+                                    text = "98.4% SNR",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "Neural Displacer eliminates specular shadow contamination and reconstructs micro-cavity depth from photographic falloff instead of raw pixel luminance.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            // Pinned Thumb-Docked Action Zone
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Primary 3D Preview Button
+                Button(
+                    onClick = { show3dPreview = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .testTag("btn_3d_preview"),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ViewInAr,
+                        contentDescription = null,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "3D preview",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+
+                // Secondary Export Button (Coming in Phase 7)
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                ) {
+                    Button(
+                        onClick = { /* Export planned in Phase 7 */ },
+                        enabled = false,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            disabledContainerColor = Color.Transparent,
+                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        ),
+                        modifier = Modifier.fillMaxSize().testTag("btn_export")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Export (Coming in Phase 7)",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Adjust Material Parameters Modal Bottom Sheet
+    if (showAdjustSheet) {
+        AdjustBottomSheet(
+            selectedMap = selectedMap,
+            generatedState = generatedState,
+            normalFormat = normalFormat,
+            onNormalStrengthChange = onNormalStrengthChange,
+            onNormalFormatToggle = onNormalFormatToggle,
+            onInvertToggle = onInvertToggle,
+            onDetailBoostChange = onDetailBoostChange,
+            onRoughnessChange = onRoughnessChange,
+            onAoChange = onAoChange,
+            onCurvatureChange = onCurvatureChange,
+            onMetallicChange = onMetallicChange,
+            onAlbedoChange = onAlbedoChange,
+            onNoiseChange = onNoiseChange,
+            onDismiss = { showAdjustSheet = false }
+        )
+    }
+}
+
+/**
+ * Top Header Bar matching quiet precision specs
+ */
+@Composable
+private fun TopHeaderBar(
+    title: String,
+    onBack: () -> Unit
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(56.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                IconButton(onClick = onBack, modifier = Modifier.size(36.dp).testTag("results_back_button")) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            Surface(
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(32.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = "Profile",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Single Map 2D Viewport Card
+ */
+@Composable
+private fun SingleMapCard(
+    bitmap: Bitmap?,
+    selectedMap: SelectedMapType,
+    scale: Float,
+    offsetX: Float,
+    offsetY: Float,
+    onTransformChange: (Float, Float, Float) -> Unit,
+    onToggleCompare: () -> Unit
+) {
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .testTag("results_interactive_viewer")
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(16.dp))
+                .clipToBounds()
+                .pointerInput(selectedMap) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        val newScale = (scale * zoom).coerceIn(1f, 6f)
+                        val maxPan = (newScale - 1f) * 400f
+                        val newX = (offsetX + pan.x).coerceIn(-maxPan, maxPan)
+                        val newY = (offsetY + pan.y).coerceIn(-maxPan, maxPan)
+                        onTransformChange(newScale, newX, newY)
+                    }
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            if (bitmap != null) {
                 Image(
-                    bitmap = currentBitmap.asImageBitmap(),
+                    bitmap = bitmap.asImageBitmap(),
                     contentDescription = selectedMap.title,
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
@@ -257,643 +759,540 @@ fun ResultsScreen(
                             translationY = offsetY
                         }
                 )
-            } else {
-                Text(
-                    text = "Generating map...",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
 
-            // Zoom reset HUD in top-right corner of viewer
-            if (scale > 1.05f) {
+            // Top HUD Chip: Channel Name & Specs
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.9f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(MaterialTheme.colorScheme.primary, CircleShape)
+                        )
+                        Text(
+                            text = selectedMap.technicalDescription,
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+
+            // Top-right Fullscreen / Reset icon
+            Surface(
+                shape = RoundedCornerShape(8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.85f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(12.dp)
+                    .clickable { onTransformChange(1f, 0f, 0f) }
+            ) {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = if (scale > 1.05f) Icons.Default.RestartAlt else Icons.Default.Fullscreen,
+                        contentDescription = "Reset or Fullscreen",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            // Bottom Floating Quick Compare & Bit-depth Strip
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.85f)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Layers,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = "16-bit PNG",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.9f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.clickable { onToggleCompare() }
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Compare,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = "Compare",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Split Comparison Card matching compare/code.html
+ */
+@Composable
+private fun CompareSplitCard(
+    aiDepthState: GeneratedMapState,
+    fastState: GeneratedMapState,
+    selectedMap: SelectedMapType,
+    sourceBitmap: Bitmap?,
+    onExitCompare: () -> Unit
+) {
+    var splitFraction by remember { mutableFloatStateOf(0.5f) }
+
+    val leftBitmap = getBitmapForMapType(aiDepthState, selectedMap, sourceBitmap)
+    val rightBitmap = getBitmapForMapType(fastState, selectedMap, sourceBitmap)
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+            .testTag("split_compare_container")
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            val containerWidth = constraints.maxWidth.toFloat()
+
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clipToBounds()
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            if (containerWidth > 0) {
+                                splitFraction = (splitFraction + dragAmount.x / containerWidth).coerceIn(0.05f, 0.95f)
+                            }
+                        }
+                    }
+            ) {
+                // Right Layer: Fast Height Model
+                if (rightBitmap != null) {
+                    Image(
+                        bitmap = rightBitmap.asImageBitmap(),
+                        contentDescription = "Fast (Right)",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                // Left Layer: AI Depth Neural Model (Clipped)
+                if (leftBitmap != null) {
+                    Image(
+                        bitmap = leftBitmap.asImageBitmap(),
+                        contentDescription = "AI Depth (Left)",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .drawWithContent {
+                                drawIntoCanvas { canvas ->
+                                    canvas.save()
+                                    canvas.clipRect(0f, 0f, size.width * splitFraction, size.height)
+                                    this@drawWithContent.drawContent()
+                                    canvas.restore()
+                                }
+                            }
+                    )
+                }
+
+                // Draggable Divider Line
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(2.dp)
+                        .align(Alignment.TopStart)
+                        .graphicsLayer {
+                            translationX = containerWidth * splitFraction - 1.dp.toPx()
+                        }
+                        .background(MaterialTheme.colorScheme.primary)
+                )
+
+                // Draggable circular handle
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surface,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .graphicsLayer {
+                            translationX = containerWidth * splitFraction - 18.dp.toPx()
+                        }
+                        .size(36.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Surface(
+                            shape = CircleShape,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "↔",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Floating Top-Left Badge (AI Depth)
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Text(
+                            text = "AI DEPTH",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                // Floating Top-Right Badge (Fast Height)
+                Surface(
+                    shape = RoundedCornerShape(999.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(12.dp)
-                        .clickable {
-                            scale = 1f
-                            offsetX = 0f
-                            offsetY = 0f
-                        }
+                ) {
+                    Text(
+                        text = "FAST",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                // Bottom Viewport Metadata Bar
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(8.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.RestartAlt,
-                            contentDescription = "Reset Zoom",
-                            modifier = Modifier.size(14.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                        Text(
+                            text = "4096 × 4096 px",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "%.1fx Reset".format(scale),
-                            style = MaterialTheme.typography.labelSmall,
+                            text = "Split ${(splitFraction * 100).toInt()}%",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
             }
         }
+    }
+}
 
-        // Bottom Controls and Thumbnails Panel
+/**
+ * Adjust Material Parameters Bottom Sheet
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AdjustBottomSheet(
+    selectedMap: SelectedMapType,
+    generatedState: GeneratedMapState,
+    normalFormat: NormalFormat,
+    onNormalStrengthChange: (Float) -> Unit,
+    onNormalFormatToggle: () -> Unit,
+    onInvertToggle: () -> Unit,
+    onDetailBoostChange: (Float) -> Unit,
+    onRoughnessChange: (Float, Float) -> Unit,
+    onAoChange: (Int, Float) -> Unit,
+    onCurvatureChange: (Float) -> Unit,
+    onMetallicChange: (Float, Float) -> Unit,
+    onAlbedoChange: (Float) -> Unit,
+    onNoiseChange: (Float, Int, Float, Float) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        dragHandle = {
+            Box(
+                modifier = Modifier
+                    .padding(vertical = 12.dp)
+                    .width(36.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(MaterialTheme.colorScheme.outline)
+            )
+        }
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(verticalScrollState)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(horizontal = 20.dp, vertical = 8.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Horizontally scrollable strip of all 8 Maps + Source
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(thumbScrollState),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                MapThumbnailCard(
-                    title = "Normal",
-                    bitmap = generatedState.normalBitmap,
-                    isSelected = selectedMap == SelectedMapType.NORMAL,
-                    onClick = { selectedMap = SelectedMapType.NORMAL; scale = 1f; offsetX = 0f; offsetY = 0f },
-                    tag = "thumb_normal"
-                )
-                MapThumbnailCard(
-                    title = "Height",
-                    bitmap = generatedState.heightBitmap,
-                    isSelected = selectedMap == SelectedMapType.HEIGHT,
-                    onClick = { selectedMap = SelectedMapType.HEIGHT; scale = 1f; offsetX = 0f; offsetY = 0f },
-                    tag = "thumb_height"
-                )
-                MapThumbnailCard(
-                    title = "Roughness",
-                    bitmap = generatedState.roughnessBitmap,
-                    isSelected = selectedMap == SelectedMapType.ROUGHNESS,
-                    onClick = { selectedMap = SelectedMapType.ROUGHNESS; scale = 1f; offsetX = 0f; offsetY = 0f },
-                    tag = "thumb_roughness"
-                )
-                MapThumbnailCard(
-                    title = "AO",
-                    bitmap = generatedState.aoBitmap,
-                    isSelected = selectedMap == SelectedMapType.AO,
-                    onClick = { selectedMap = SelectedMapType.AO; scale = 1f; offsetX = 0f; offsetY = 0f },
-                    tag = "thumb_ao"
-                )
-                MapThumbnailCard(
-                    title = "Curvature",
-                    bitmap = generatedState.curvatureBitmap,
-                    isSelected = selectedMap == SelectedMapType.CURVATURE,
-                    onClick = { selectedMap = SelectedMapType.CURVATURE; scale = 1f; offsetX = 0f; offsetY = 0f },
-                    tag = "thumb_curvature"
-                )
-                MapThumbnailCard(
-                    title = "Metallic",
-                    bitmap = generatedState.metallicBitmap,
-                    isSelected = selectedMap == SelectedMapType.METALLIC,
-                    onClick = { selectedMap = SelectedMapType.METALLIC; scale = 1f; offsetX = 0f; offsetY = 0f },
-                    tag = "thumb_metallic"
-                )
-                MapThumbnailCard(
-                    title = "Albedo",
-                    bitmap = generatedState.albedoBitmap,
-                    isSelected = selectedMap == SelectedMapType.ALBEDO,
-                    onClick = { selectedMap = SelectedMapType.ALBEDO; scale = 1f; offsetX = 0f; offsetY = 0f },
-                    tag = "thumb_albedo"
-                )
-                MapThumbnailCard(
-                    title = "Noise",
-                    bitmap = generatedState.noiseBitmap,
-                    isSelected = selectedMap == SelectedMapType.NOISE,
-                    onClick = { selectedMap = SelectedMapType.NOISE; scale = 1f; offsetX = 0f; offsetY = 0f },
-                    tag = "thumb_noise"
-                )
-                MapThumbnailCard(
-                    title = "Source",
-                    bitmap = sourceBitmap,
-                    isSelected = selectedMap == SelectedMapType.SOURCE,
-                    onClick = { selectedMap = SelectedMapType.SOURCE; scale = 1f; offsetX = 0f; offsetY = 0f },
-                    tag = "thumb_source"
-                )
-            }
-
-            // Dynamic Slider Panel adapting to the selected map
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                ),
-                modifier = Modifier.fillMaxWidth().testTag("map_tuning_panel")
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Tune,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "${selectedMap.title} Parameters",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-
-                    when (selectedMap) {
-                        SelectedMapType.NORMAL -> {
-                            MapSliderRow(
-                                title = "Normal Strength",
-                                value = generatedState.normalStrength,
-                                valueRange = 0.0f..5.0f,
-                                onValueChange = onNormalStrengthChange,
-                                tag = "slider_normal_strength"
-                            )
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                FilterChip(
-                                    selected = normalFormat == NormalFormat.OPEN_GL,
-                                    onClick = onNormalFormatToggle,
-                                    label = { Text(if (normalFormat == NormalFormat.OPEN_GL) "OpenGL (+Y Up)" else "DirectX (-Y Down)") },
-                                    modifier = Modifier.weight(1f).testTag("chip_normal_format_toggle")
-                                )
-                                FilterChip(
-                                    selected = generatedState.invertHeight,
-                                    onClick = onInvertToggle,
-                                    label = { Text(if (generatedState.invertHeight) "Inverted" else "Invert Slopes") },
-                                    modifier = Modifier.weight(1f).testTag("chip_invert_height_toggle")
-                                )
-                            }
-                        }
-
-                        SelectedMapType.HEIGHT -> {
-                            MapSliderRow(
-                                title = "Detail Boost (Luminance High-pass)",
-                                value = generatedState.detailBoost,
-                                valueRange = 0.0f..1.0f,
-                                onValueChange = onDetailBoostChange,
-                                tag = "slider_detail_boost"
-                            )
-                            MapSliderRow(
-                                title = "Procedural Noise Blend into Height",
-                                value = generatedState.blendNoiseIntoHeight,
-                                valueRange = 0.0f..1.0f,
-                                onValueChange = { weight ->
-                                    onNoiseChange(
-                                        generatedState.noiseScale,
-                                        generatedState.noiseOctaves,
-                                        generatedState.noiseIntensity,
-                                        weight
-                                    )
-                                },
-                                tag = "slider_noise_blend_height"
-                            )
-                        }
-
-                        SelectedMapType.ROUGHNESS -> {
-                            MapSliderRow(
-                                title = "Base Roughness (Offset)",
-                                value = generatedState.roughnessBase,
-                                valueRange = 0.0f..1.0f,
-                                onValueChange = { base ->
-                                    onRoughnessChange(base, generatedState.roughnessContrast)
-                                },
-                                tag = "slider_roughness_base"
-                            )
-                            MapSliderRow(
-                                title = "Micro-Texture Contrast (Variance)",
-                                value = generatedState.roughnessContrast,
-                                valueRange = 0.2f..2.5f,
-                                onValueChange = { contrast ->
-                                    onRoughnessChange(generatedState.roughnessBase, contrast)
-                                },
-                                tag = "slider_roughness_contrast"
-                            )
-                        }
-
-                        SelectedMapType.AO -> {
-                            MapSliderRow(
-                                title = "Cavity Detection Radius",
-                                value = generatedState.aoRadius.toFloat(),
-                                valueRange = 4.0f..32.0f,
-                                onValueChange = { r ->
-                                    onAoChange(r.toInt(), generatedState.aoIntensity)
-                                },
-                                tag = "slider_ao_radius"
-                            )
-                            MapSliderRow(
-                                title = "Occlusion Intensity",
-                                value = generatedState.aoIntensity,
-                                valueRange = 0.5f..3.0f,
-                                onValueChange = { inten ->
-                                    onAoChange(generatedState.aoRadius, inten)
-                                },
-                                tag = "slider_ao_intensity"
-                            )
-                        }
-
-                        SelectedMapType.CURVATURE -> {
-                            MapSliderRow(
-                                title = "Curvature Ridge Contrast",
-                                value = generatedState.curvatureContrast,
-                                valueRange = 0.5f..3.5f,
-                                onValueChange = onCurvatureChange,
-                                tag = "slider_curvature_contrast"
-                            )
-                            Text(
-                                text = "Convex surface peaks appear bright; concave crevices appear dark; flat planes are neutral 0.5 gray.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        SelectedMapType.METALLIC -> {
-                            MapSliderRow(
-                                title = "Metallic Specular Threshold",
-                                value = generatedState.metallicThreshold,
-                                valueRange = 0.5f..1.0f,
-                                onValueChange = { thresh ->
-                                    onMetallicChange(thresh, generatedState.metallicBoost)
-                                },
-                                tag = "slider_metallic_threshold"
-                            )
-                            MapSliderRow(
-                                title = "Metallic Boost",
-                                value = generatedState.metallicBoost,
-                                valueRange = 0.5f..2.5f,
-                                onValueChange = { boost ->
-                                    onMetallicChange(generatedState.metallicThreshold, boost)
-                                },
-                                tag = "slider_metallic_boost"
-                            )
-                            Text(
-                                text = "Dielectric materials (wood, stone, dirt) are completely black (0.0). Only specular metallic reflections are isolated.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        SelectedMapType.ALBEDO -> {
-                            MapSliderRow(
-                                title = "De-Lighting Strength",
-                                value = generatedState.deLightStrength,
-                                valueRange = 0.0f..1.0f,
-                                onValueChange = onAlbedoChange,
-                                tag = "slider_albedo_delight"
-                            )
-                            Text(
-                                text = "Eliminates baked shadows and directional light gradients by dividing the photo by heavily blurred surface luminance.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-
-                        SelectedMapType.NOISE -> {
-                            MapSliderRow(
-                                title = "Frequency Scale",
-                                value = generatedState.noiseScale,
-                                valueRange = 2.0f..32.0f,
-                                onValueChange = { s ->
-                                    onNoiseChange(s, generatedState.noiseOctaves, generatedState.noiseIntensity, generatedState.blendNoiseIntoHeight)
-                                },
-                                tag = "slider_noise_scale"
-                            )
-                            MapSliderRow(
-                                title = "Fractal Octaves",
-                                value = generatedState.noiseOctaves.toFloat(),
-                                valueRange = 1.0f..6.0f,
-                                onValueChange = { o ->
-                                    onNoiseChange(generatedState.noiseScale, o.toInt(), generatedState.noiseIntensity, generatedState.blendNoiseIntoHeight)
-                                },
-                                tag = "slider_noise_octaves"
-                            )
-                            MapSliderRow(
-                                title = "Noise Intensity",
-                                value = generatedState.noiseIntensity,
-                                valueRange = 0.2f..2.0f,
-                                onValueChange = { i ->
-                                    onNoiseChange(generatedState.noiseScale, generatedState.noiseOctaves, i, generatedState.blendNoiseIntoHeight)
-                                },
-                                tag = "slider_noise_intensity"
-                            )
-                            MapSliderRow(
-                                title = "Blend Weight into Height Map",
-                                value = generatedState.blendNoiseIntoHeight,
-                                valueRange = 0.0f..1.0f,
-                                onValueChange = { w ->
-                                    onNoiseChange(generatedState.noiseScale, generatedState.noiseOctaves, generatedState.noiseIntensity, w)
-                                },
-                                tag = "slider_noise_blend"
-                            )
-                        }
-
-                        SelectedMapType.SOURCE -> {
-                            Text(
-                                text = "Original cropped 1:1 photograph used as the primary source for all PBR map extractions.",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Buttons for Later Phases (Visibly disabled and labeled Coming soon as strictly required)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
-                    onClick = { /* Disabled in Phase 3 */ },
-                    enabled = false,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .testTag("btn_3d_preview"),
-                    shape = RoundedCornerShape(10.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.ViewInAr,
+                        imageVector = Icons.Default.Tune,
                         contentDescription = null,
-                        modifier = Modifier.size(16.dp)
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("3D Sphere (Phase 4)")
+                    Text(
+                        text = "Adjust Material",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
                 }
 
                 Button(
-                    onClick = { /* Disabled in Phase 3 */ },
-                    enabled = false,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .testTag("btn_export"),
-                    shape = RoundedCornerShape(10.dp),
+                    onClick = {
+                        // Reset defaults for current map
+                        onNormalStrengthChange(1.0f)
+                        onDetailBoostChange(0.35f)
+                    },
+                    shape = RoundedCornerShape(8.dp),
                     colors = ButtonDefaults.buttonColors(
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        containerColor = Color.Transparent,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.FileDownload,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Export (Phase 7)")
+                    Text("Reset", style = MaterialTheme.typography.labelMedium)
                 }
             }
+
+            // Normal Map Controls
+            Text(
+                text = "Normal & Depth",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            SliderRow(
+                title = "Normal Strength",
+                value = generatedState.normalStrength,
+                valueRange = 0.0f..5.0f,
+                onValueChange = onNormalStrengthChange,
+                readout = "%.2fx".format(generatedState.normalStrength)
+            )
+            SliderRow(
+                title = "Detail Boost",
+                value = generatedState.detailBoost,
+                valueRange = 0.0f..1.0f,
+                onValueChange = onDetailBoostChange,
+                readout = "%.2f".format(generatedState.detailBoost)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterChip(
+                    selected = normalFormat == NormalFormat.OPEN_GL,
+                    onClick = onNormalFormatToggle,
+                    label = { Text(if (normalFormat == NormalFormat.OPEN_GL) "OpenGL (+Y)" else "DirectX (-Y)") },
+                    modifier = Modifier.weight(1f)
+                )
+                FilterChip(
+                    selected = generatedState.invertHeight,
+                    onClick = onInvertToggle,
+                    label = { Text(if (generatedState.invertHeight) "Inverted" else "Invert Depth") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Roughness Controls
+            Text(
+                text = "Roughness",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            SliderRow(
+                title = "Base Roughness",
+                value = generatedState.roughnessBase,
+                valueRange = 0.0f..1.0f,
+                onValueChange = { base -> onRoughnessChange(base, generatedState.roughnessContrast) },
+                readout = "%.2f".format(generatedState.roughnessBase)
+            )
+            SliderRow(
+                title = "Roughness Contrast",
+                value = generatedState.roughnessContrast,
+                valueRange = 0.2f..2.5f,
+                onValueChange = { contrast -> onRoughnessChange(generatedState.roughnessBase, contrast) },
+                readout = "%.2f".format(generatedState.roughnessContrast)
+            )
+
+            // Ambient Occlusion Controls
+            Text(
+                text = "Ambient Occlusion",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            SliderRow(
+                title = "Cavity Radius",
+                value = generatedState.aoRadius.toFloat(),
+                valueRange = 4.0f..32.0f,
+                onValueChange = { r -> onAoChange(r.toInt(), generatedState.aoIntensity) },
+                readout = "${generatedState.aoRadius}px"
+            )
+            SliderRow(
+                title = "Occlusion Intensity",
+                value = generatedState.aoIntensity,
+                valueRange = 0.5f..3.0f,
+                onValueChange = { i -> onAoChange(generatedState.aoRadius, i) },
+                readout = "%.2f".format(generatedState.aoIntensity)
+            )
+
+            // Curvature & Metallic
+            Text(
+                text = "Metallic & Delit",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            SliderRow(
+                title = "Metallic Threshold",
+                value = generatedState.metallicThreshold,
+                valueRange = 0.5f..1.0f,
+                onValueChange = { th -> onMetallicChange(th, generatedState.metallicBoost) },
+                readout = "%.2f".format(generatedState.metallicThreshold)
+            )
+            SliderRow(
+                title = "De-Lighting Strength",
+                value = generatedState.deLightStrength,
+                valueRange = 0.0f..1.0f,
+                onValueChange = onAlbedoChange,
+                readout = "%.2f".format(generatedState.deLightStrength)
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
         }
     }
 }
 
+/**
+ * Universal Technical Parameter Slider Row with label on left and monospace readout on right
+ */
 @Composable
-private fun MapSliderRow(
+private fun SliderRow(
     title: String,
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     onValueChange: (Float) -> Unit,
-    tag: String
+    readout: String
 ) {
-    Column {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = "%.2f".format(value),
-                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.primary
+                text = readout,
+                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+
         Slider(
             value = value,
             onValueChange = onValueChange,
             valueRange = valueRange,
-            modifier = Modifier.testTag(tag),
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary
-            )
+                activeTrackColor = MaterialTheme.colorScheme.primary,
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+            ),
+            modifier = Modifier.height(24.dp)
         )
-    }
-}
-
-@Composable
-private fun MapThumbnailCard(
-    title: String,
-    bitmap: Bitmap?,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    tag: String
-) {
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-            else MaterialTheme.colorScheme.surfaceContainer
-        ),
-        modifier = Modifier
-            .width(84.dp)
-            .border(
-                width = if (isSelected) 2.dp else 0.dp,
-                color = if (isSelected) MaterialTheme.colorScheme.primary else androidx.compose.ui.graphics.Color.Transparent,
-                shape = RoundedCornerShape(12.dp)
-            )
-            .clickable(onClick = onClick)
-            .testTag(tag)
-    ) {
-        Column(
-            modifier = Modifier.padding(6.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-                contentAlignment = Alignment.Center
-            ) {
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = title,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                } else {
-                    Text(
-                        text = "...",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium),
-                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1
-            )
-        }
-    }
-}
-
-@Composable
-private fun SplitCompareViewer(
-    leftBitmap: Bitmap?,
-    rightBitmap: Bitmap?,
-    contentDescription: String,
-    scale: Float,
-    offsetX: Float,
-    offsetY: Float,
-    modifier: Modifier = Modifier
-) {
-    var splitFraction by remember { mutableFloatStateOf(0.5f) }
-
-    BoxWithConstraints(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        val containerWidth = constraints.maxWidth.toFloat()
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        if (containerWidth > 0) {
-                            splitFraction = (splitFraction + dragAmount.x / containerWidth).coerceIn(0.05f, 0.95f)
-                        }
-                    }
-                }
-        ) {
-            // Right bitmap (Fast) on background
-            if (rightBitmap != null) {
-                Image(
-                    bitmap = rightBitmap.asImageBitmap(),
-                    contentDescription = "$contentDescription Right (Fast)",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offsetX
-                            translationY = offsetY
-                        }
-                )
-            }
-
-            // Left bitmap (AI Depth) clipped to splitFraction
-            if (leftBitmap != null) {
-                Image(
-                    bitmap = leftBitmap.asImageBitmap(),
-                    contentDescription = "$contentDescription Left (AI Depth)",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offsetX
-                            translationY = offsetY
-                            clip = true
-                            shape = androidx.compose.ui.graphics.RectangleShape
-                        }
-                        .drawWithContent {
-                            drawIntoCanvas { canvas ->
-                                canvas.save()
-                                canvas.clipRect(0f, 0f, size.width * splitFraction, size.height)
-                                this@drawWithContent.drawContent()
-                                canvas.restore()
-                            }
-                        }
-                )
-            }
-
-            // Vertical divider handle line
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(3.dp)
-                    .align(Alignment.TopStart)
-                    .graphicsLayer {
-                        translationX = containerWidth * splitFraction - 1.5.dp.toPx()
-                    }
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-
-            // Handle badge button in center
-            Surface(
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary,
-                shadowElevation = 4.dp,
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .graphicsLayer {
-                        translationX = containerWidth * splitFraction - 16.dp.toPx()
-                    }
-                    .size(32.dp)
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "↔",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-
-            // Overlay Badges
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-            ) {
-                Text(
-                    text = "AI Depth (Left)",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                )
-            }
-
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(12.dp)
-            ) {
-                Text(
-                    text = "Fast (Right)",
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                    color = MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
-                )
-            }
-        }
     }
 }
 

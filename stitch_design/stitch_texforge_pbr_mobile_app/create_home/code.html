@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#171A21;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "tertiary-fixed-dim": "#ffb874", "primary": "#b2c5ff", "on-primary": "#0B1220", "warning": "#F5B84B", "on-secondary": "#1e2f58", "on-surface-variant": "#9AA3B2", "secondary": "#b5c5f7", "secondary-container": "#354570", "surface-container-low": "#1a1c20", "on-error-container": "#ffdad6", "on-secondary-fixed": "#051942", "error-container": "#93000a", "background": "#111317", "outline-variant": "#434653", "surface-container-highest": "#333539", "on-primary-container": "#002665", "on-tertiary-fixed": "#2d1600", "on-tertiary-container": "#412200", "tertiary-container": "#d47b00", "error": "#FF6B6B", "tertiary-fixed": "#ffdcbf", "outline": "#2A2F3A", "surface-container-high": "#282a2e", "surface": "#171A21", "on-error": "#690005", "inverse-surface": "#e2e2e8", "surface-container": "#1e2024", "primary-fixed": "#dae2ff", "primary-fixed-dim": "#b2c5ff", "on-tertiary": "#4b2800", "secondary-fixed-dim": "#b5c5f7", "on-primary-fixed-variant": "#0040a0", "on-background": "#e2e2e8", "on-secondary-fixed-variant": "#354570", "surface-bright": "#37393e", "inverse-on-surface": "#2f3035", "surface-container-lowest": "#0c0e12", "tertiary": "#ffb874", "on-secondary-container": "#a4b4e5", "on-surface": "#e2e2e8", "surface-variant": "#333539", "on-primary-fixed": "#001847", "secondary-fixed": "dae2ff", "surface-tint": "#b2c5ff", "inverse-primary": "#1857c8", "surface-dim": "#111317", "on-tertiary-fixed-variant": "#6a3b00", "success": "#3DD68C", "primary-container": "#5b8cff" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "2rem", "space-xs": "0.25rem", "gutter": "1rem", "space-sm": "0.5rem", "margin": "1rem", "space-md": "1rem", "space-lg": "1.5rem" }, fontFamily: { "headline-lg": ["Inter"], "headline-md": ["Inter"], "body-md": ["Inter"], "title-md": ["Inter"], "label-md": ["Inter"], "label-sm": ["Inter"], "caption-sm": ["Inter"] }, fontSize: { "headline-lg": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }], "headline-md": ["20px", { lineHeight: "28px", letterSpacing: "-0.005em", fontWeight: "600" }], "body-md": ["16px", { lineHeight: "24px", letterSpacing: "0em", fontWeight: "400" }], "title-md": ["18px", { lineHeight: "24px", letterSpacing: "0em", fontWeight: "600" }], "label-md": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "500" }], "label-sm": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "500" }], "caption-sm": ["12px", { lineHeight: "16px", letterSpacing: "0.01em", fontWeight: "400" }] } } } };</script></head><body class="bg-surface font-body-md text-body-md text-on-surface flex flex-col min-h-screen selection:bg-primary-container selection:text-on-primary"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-14 px-margin flex items-center justify-between"><div class="flex items-center gap-space-sm"><img alt="TexForge Logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCcDNy3bbpEX0LjDce6riOOjd2yVjlW7-sBaDnefRU57G-E_xLJgi-jz5Ty_KbfWXwNetkehbVIUbpC-4OfVt4wS55QfA3h0CIAI_1A7nU61LkSgiV3qn2SHCvJpjX03dMXr3VUN3FPluVRc8Qbc090ocTSPkDFZdCNbtVNwc_EAvaxcHihfxcIGbqvLMdAdZ5ET3vTb1GG9tkw5yn18XicjQI6AantWNkJqln0OmQ"/><span class="font-title-md text-title-md text-on-surface">TexForge</span><span class="text-on-surface-variant font-label-sm text-label-sm hidden sm:inline-block">/</span><h1 class="font-label-md text-label-md text-on-surface-variant truncate max-w-[140px]">Create</h1></div><div class="flex items-center gap-space-sm"><button aria-label="Notifications" class="w-11 h-11 flex items-center justify-center text-on-surface-variant hover:text-on-surface transition-colors"><span class="material-symbols-outlined text-[20px]">notifications</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex-1 flex flex-col relative w-full pt-14 pb-[calc(4rem+env(safe-area-inset-bottom,0px))] px-margin bg-surface"><div class="flex flex-col w-full gap-space-lg select-none">
+<!-- Header Title -->
+<div class="flex items-center justify-between pt-1">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface tracking-tight">New texture</h2>
+<p class="font-caption-sm text-caption-sm text-on-surface-variant mt-0.5">Physical material generator engine</p>
+</div>
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm">
+      v2.4 PBR
+    </span>
+</div>
+<!-- Primary Ingestion Workshop Card -->
+<section class="bg-surface-container-low rounded-xl p-5 flex flex-col items-center text-center shadow-sm relative overflow-hidden">
+<!-- Subtle Ambient Backdrop Accent -->
+<div class="absolute -top-16 -right-16 w-44 h-44 rounded-full bg-primary-container/10 blur-3xl pointer-events-none"></div>
+<div class="absolute -bottom-16 -left-16 w-44 h-44 rounded-full bg-secondary-container/20 blur-3xl pointer-events-none"></div>
+<!-- Visual Scanner Reticle / Interactive Preview Zone -->
+<div class="relative w-28 h-28 my-3 flex items-center justify-center">
+<!-- Outer Geometric Indicator Frame -->
+<div class="absolute inset-0 rounded-xl bg-surface-container-high flex items-center justify-center shadow-inner">
+<!-- Technical Mesh Grid Overlay Pattern -->
+<svg class="w-full h-full opacity-20 text-on-surface-variant" fill="none" stroke="currentColor" viewbox="0 0 100 100">
+<path d="M0 25h100M0 50h100M0 75h100M25 0v100M50 0v100M75 0v100" stroke-dasharray="2 3" stroke-width="0.75"></path>
+<circle cx="50" cy="50" r="32" stroke-width="1"></circle>
+</svg>
+</div>
+<!-- Core Dynamic Icon & Micro Beacon -->
+<div class="relative z-10 w-16 h-16 rounded-xl bg-surface-container-highest flex items-center justify-center text-primary shadow-sm">
+<span class="material-symbols-outlined text-[36px]">filter_center_focus</span>
+<span class="absolute top-1 right-1 flex h-2.5 w-2.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary-container"></span>
+</span>
+</div>
+</div>
+<!-- Typography Content -->
+<div class="mt-2 mb-6 max-w-[280px]">
+<h3 class="font-title-md text-title-md text-on-surface">Start from a photo</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mt-1 text-sm leading-relaxed">
+        Convert camera shots into seamless, multi-channel PBR materials.
+      </p>
+</div>
+<!-- Ingestion Actions (Thumb ergonomically accessible) -->
+<div class="w-full flex flex-col gap-space-sm">
+<!-- Primary Action: Camera Capture -->
+<button class="w-full h-[52px] rounded-xl bg-primary-container text-on-primary font-label-md text-label-md flex items-center justify-center gap-space-sm active:opacity-90 transition-all shadow-sm focus:outline-none" id="btn-take-photo" type="button">
+<span class="material-symbols-outlined text-[20px]" style="font-variation-settings: 'FILL' 1;">photo_camera</span>
+<span>Take photo</span>
+</button>
+<!-- Secondary Action: Photo Import -->
+<button class="w-full h-[52px] rounded-xl bg-surface-container text-on-surface font-label-md text-label-md flex items-center justify-center gap-space-sm active:bg-surface-container-high transition-colors focus:outline-none" id="btn-choose-gallery" type="button">
+<span class="material-symbols-outlined text-[20px]">photo_library</span>
+<span>Choose from gallery</span>
+</button>
+</div>
+</section>
+<!-- Technical Processing Specs Pill Row -->
+<div class="grid grid-cols-3 gap-2 px-1">
+<div class="bg-surface-container-lowest rounded-lg p-2.5 flex flex-col items-center justify-center text-center">
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Channels</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold mt-0.5">8 Maps</span>
+</div>
+<div class="bg-surface-container-lowest rounded-lg p-2.5 flex flex-col items-center justify-center text-center">
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Resolution</span>
+<span class="font-label-md text-label-md text-on-surface font-semibold mt-0.5">Up to 4K</span>
+</div>
+<div class="bg-surface-container-lowest rounded-lg p-2.5 flex flex-col items-center justify-center text-center">
+<span class="font-caption-sm text-caption-sm text-on-surface-variant">Engine</span>
+<span class="font-label-md text-label-md text-primary font-semibold mt-0.5">AI Delight</span>
+</div>
+</div>
+<!-- Recent Projects Section -->
+<section class="flex flex-col gap-space-sm pt-1">
+<div class="flex items-center justify-between">
+<h3 class="font-title-md text-title-md text-on-surface tracking-tight">Recent</h3>
+<button class="font-label-sm text-label-sm text-primary hover:text-primary-fixed transition-colors flex items-center gap-0.5" type="button">
+<span>View all</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+</button>
+</div>
+<!-- Horizontal Scroll Carousel for Fast Browsing -->
+<div class="flex gap-space-md overflow-x-auto pb-2 pt-1 -mx-margin px-margin scrollbar-none snap-x snap-mandatory">
+<!-- Card 1: Dark Granite -->
+<article class="snap-start shrink-0 w-[138px] bg-surface-container-low rounded-xl p-2 flex flex-col gap-2 shadow-sm transition-transform active:scale-[0.98] hover:bg-surface-container cursor-pointer focus:outline-none" role="button" tabindex="0">
+<div class="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-container-highest">
+<img alt="Dark Granite texture surface" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC7TNFbO2E1OGpeeLD2G_gylqxsURD-9UxtWgrZyA_BTCvMu2FTcYfUAel-cH8A8vgpLM_uPcLCnIZmuVBhJ1iBYcMfCT0zUAGu1BJXoIU7mLDGiJK9abyq-CK3j4CAaHmv_nsAnxE55XLHxNWf5Z0oAr1tCdNfE_lAqgFKhix0eQsSf6rU8ioIBSiFjiMhKUcDWC3y-c5J1PQO4gJu69_YOOMzVqyC-FJKGMhBosU"/>
+<span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-sm text-on-surface font-caption-sm text-[10px] uppercase tracking-wider font-semibold">
+            2K
+          </span>
+</div>
+<div class="flex flex-col min-w-0 px-0.5 pb-0.5">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">Dark Granite</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant truncate">8 maps · 2K</span>
+</div>
+</article>
+<!-- Card 2: Old Brick -->
+<article class="snap-start shrink-0 w-[138px] bg-surface-container-low rounded-xl p-2 flex flex-col gap-2 shadow-sm transition-transform active:scale-[0.98] hover:bg-surface-container cursor-pointer focus:outline-none" role="button" tabindex="0">
+<div class="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-container-highest">
+<img alt="Old Brick masonry surface" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAXQrl-e-EEEYEWAtP2dbdYYsMgSNsQehEN5ScwheHfSSLk7839PQ_AeyaO7MBSRa1n-oQz7EP1sJV8gqTzLikwGSVEGlgvj7Y9iKKR0cyBQuxYoPdrRBARCOq1oc1ao0U8x0eFp87uovwNC56w8dkTIoew0uXp6It_9xj92nzkCGa2nzQEEWRRYfltgmRmyUenjl5ySQP7gps4IlFZznaAf-i7yCUj03KjPQ8IWPw"/>
+<span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-sm text-on-surface font-caption-sm text-[10px] uppercase tracking-wider font-semibold">
+            2K
+          </span>
+</div>
+<div class="flex flex-col min-w-0 px-0.5 pb-0.5">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">Old Brick</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant truncate">8 maps · 2K</span>
+</div>
+</article>
+<!-- Card 3: Rough Slate -->
+<article class="snap-start shrink-0 w-[138px] bg-surface-container-low rounded-xl p-2 flex flex-col gap-2 shadow-sm transition-transform active:scale-[0.98] hover:bg-surface-container cursor-pointer focus:outline-none" role="button" tabindex="0">
+<div class="relative w-full aspect-square rounded-lg overflow-hidden bg-surface-container-highest">
+<img class="w-full h-full object-cover" data-alt="Close up high-resolution macro shot of natural rugged dark charcoal slate stone layered with subtle mineral streaks and granular roughness, cinematic soft studio overhead lighting, realistic depth and tactile displacement, 3D texture ready." src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1VAAMcpBXYmTIogVXzmcT02Bwjh0B2IVQnpdv6k466RVw61zWxAHeOqCtE5JhU22ZPVeqGDprVOm-GGfloOcx3eH-fdfLbuVqpDFzdqCrUvzohoFt5mCXQiBeEIquGIJFn6tNqvwkUomF_YVvXsnkw4SHOZqJ_Y8Mq6S1z1akLrDdy3rod6ykBhdum1yhavSoud6gfacinBSUCBdrvaZ8XxXz4twUA8yCS6ak4EE"/>
+<span class="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-surface-container-lowest/80 backdrop-blur-sm text-on-surface font-caption-sm text-[10px] uppercase tracking-wider font-semibold">
+            2K
+          </span>
+</div>
+<div class="flex flex-col min-w-0 px-0.5 pb-0.5">
+<span class="font-label-md text-label-md text-on-surface truncate font-medium">Rough Slate</span>
+<span class="font-caption-sm text-caption-sm text-on-surface-variant truncate">8 maps · 2K</span>
+</div>
+</article>
+</div>
+</section>
+<!-- Helpful Pro-Tip Toast Container -->
+<div class="bg-surface-container-lowest/80 rounded-xl p-3.5 flex items-start gap-space-sm shadow-sm mt-0.5">
+<span class="material-symbols-outlined text-tertiary text-[20px] shrink-0 mt-0.5">lightbulb</span>
+<div class="flex flex-col min-w-0 text-left">
+<span class="font-label-md text-label-md text-on-surface font-medium">Capturing Tip</span>
+<p class="font-caption-sm text-caption-sm text-on-surface-variant leading-relaxed mt-0.5">
+        Shoot textures under diffuse, overcast sunlight to minimize baked shadows and ensure accurate roughness values.
+      </p>
+</div>
+</div>
+</div>
+<script>
+  (function() {
+    const photoBtn = document.getElementById('btn-take-photo');
+    const galleryBtn = document.getElementById('btn-choose-gallery');
+
+    if (photoBtn) {
+      photoBtn.addEventListener('click', () => {
+        // Haptic feel visual feedback
+        photoBtn.classList.add('scale-95');
+        setTimeout(() => photoBtn.classList.remove('scale-95'), 120);
+      });
+    }
+
+    if (galleryBtn) {
+      galleryBtn.addEventListener('click', () => {
+        galleryBtn.classList.add('scale-95');
+        setTimeout(() => galleryBtn.classList.remove('scale-95'), 120);
+      });
+    }
+  })();
+</script></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface/80 backdrop-blur-xl shadow-[0_-1px_8px_rgba(0,0,0,0.04)]" data-active-classes="text-primary-container"><div class="h-16 flex items-stretch justify-around px-margin"><a aria-current="page" class="flex-1 min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-0.5 transition-colors text-primary-container" data-path="create" href="#"><span class="material-symbols-outlined text-[22px]">texture</span><span class="font-caption-sm text-caption-sm">Create</span></a><a class="flex-1 min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="history" href="#"><span class="material-symbols-outlined text-[22px]">history</span><span class="font-caption-sm text-caption-sm">History</span></a><a class="flex-1 min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-0.5 text-on-surface-variant hover:text-on-surface transition-colors" data-path="settings" href="#"><span class="material-symbols-outlined text-[22px]">settings</span><span class="font-caption-sm text-caption-sm">Settings</span></a></div></nav></body></html>

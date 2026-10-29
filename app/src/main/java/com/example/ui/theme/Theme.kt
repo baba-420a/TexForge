@@ -11,41 +11,41 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
 private val DarkColorScheme = darkColorScheme(
-    primary = ForgeCyanPrimary,
-    onPrimary = ForgeCyanOnPrimary,
-    primaryContainer = ForgeCyanContainer,
-    onPrimaryContainer = ForgeCyanOnContainer,
-    secondary = ForgeAmberSecondary,
-    onSecondary = ForgeAmberOnSecondary,
-    secondaryContainer = ForgeAmberContainer,
-    onSecondaryContainer = ForgeAmberOnContainer,
-    tertiary = ForgeTealTertiary,
-    onTertiary = ForgeTealOnTertiary,
-    tertiaryContainer = ForgeTealContainer,
-    onTertiaryContainer = ForgeTealOnContainer,
-    background = ForgeDarkBg,
-    onBackground = ForgeTextPrimary,
-    surface = ForgeDarkSurface,
-    onSurface = ForgeTextPrimary,
-    surfaceVariant = ForgeSurfaceVariant,
-    onSurfaceVariant = ForgeTextSecondary,
-    surfaceContainer = ForgeSurfaceContainer,
-    surfaceContainerHigh = ForgeSurfaceContainerHigh,
-    surfaceContainerHighest = ForgeSurfaceContainerHighest,
-    outline = ForgeOutline,
-    outlineVariant = ForgeOutlineVariant,
-    error = ForgeError,
-    onError = ForgeOnError
+    primary = TexForgePrimary,
+    onPrimary = TexForgeOnPrimary,
+    primaryContainer = TexForgePrimaryContainer,
+    onPrimaryContainer = TexForgeOnPrimaryContainer,
+    secondary = TexForgeSecondary,
+    onSecondary = TexForgeOnSecondary,
+    secondaryContainer = TexForgeSecondaryContainer,
+    onSecondaryContainer = TexForgeOnSecondaryContainer,
+    tertiary = TexForgeTertiary,
+    onTertiary = TexForgeOnTertiary,
+    background = TexForgeBackground,
+    onBackground = TexForgeOnSurface,
+    surface = TexForgeSurface,
+    onSurface = TexForgeOnSurface,
+    surfaceVariant = TexForgeSurfaceVariant,
+    onSurfaceVariant = TexForgeOnSurfaceVariant,
+    surfaceContainerLowest = TexForgeSurfaceContainerLowest,
+    surfaceContainerLow = TexForgeSurfaceContainerLow,
+    surfaceContainer = TexForgeSurfaceContainer,
+    surfaceContainerHigh = TexForgeSurfaceContainerHigh,
+    surfaceContainerHighest = TexForgeSurfaceContainerHighest,
+    outline = TexForgeOutline,
+    outlineVariant = TexForgeOutlineVariant,
+    error = TexForgeError,
+    onError = TexForgeOnError
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = ForgeCyanContainer,
-    onPrimary = ForgeCyanOnContainer,
-    secondary = ForgeAmberSecondary,
-    background = ForgeDarkBg,
-    surface = ForgeDarkSurface,
-    onSurface = ForgeTextPrimary
+private val LightColorScheme = darkColorScheme(
+    primary = TexForgePrimary,
+    onPrimary = TexForgeOnPrimary,
+    background = TexForgeBackground,
+    surface = TexForgeSurface,
+    onSurface = TexForgeOnSurface
 )
+
 
 @Composable
 fun TexForgeTheme(
