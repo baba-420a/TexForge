@@ -7,6 +7,7 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,21 +25,27 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -57,12 +64,16 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.preferences.AppSettings
 import com.example.ui.ImageInputState
+import com.example.ui.ModelStatus
+import com.example.ui.ProcessingState
 import com.example.ui.components.SquareCropView
 
 @Composable
 fun CreateScreen(
     appSettings: AppSettings,
     imageState: ImageInputState,
+    processingState: ProcessingState,
+    modelStatus: ModelStatus,
     onPrepareCamera: () -> Uri,
     onCameraResult: (Boolean) -> Unit,
     onImagePicked: (Uri) -> Unit,
@@ -70,24 +81,37 @@ fun CreateScreen(
     onCancelCrop: () -> Unit,
     onReCrop: () -> Unit,
     onClearImage: () -> Unit,
+    onImportModel: (Uri) -> Unit,
+    onGenerationModeChange: (com.example.data.preferences.GenerationMode) -> Unit = {},
+    onGenerateMaps: () -> Unit,
+    onCancelGeneration: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // Camera launcher (No camera permission requested, uses FileProvider URI)
+    // Camera launcher
     val takePictureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         onCameraResult(success)
     }
 
-    // Photo Picker launcher (zero-permission modern Android Photo Picker)
+    // Photo Picker launcher
     val pickVisualMediaLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
         if (uri != null) {
             onImagePicked(uri)
+        }
+    }
+
+    // ONNX Model File Picker (OpenDocument)
+    val openModelLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            onImportModel(uri)
         }
     }
 
@@ -145,8 +169,87 @@ fun CreateScreen(
             }
         }
 
+        // Active Inference Progress Dialog / Banner
+        if (processingState.isProcessing) {
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("processing_progress_card")
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(22.dp),
+                                strokeWidth = 2.5.dp,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Text(
+                                text = "Generating PBR Maps...",
+                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Text(
+                            text = "${processingState.progressPercent}%",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    LinearProgressIndicator(
+                        progress = { processingState.progressPercent / 100f },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp)),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                    )
+
+                    Text(
+                        text = processingState.currentStep,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    OutlinedButton(
+                        onClick = onCancelGeneration,
+                        modifier = Modifier
+                            .align(Alignment.End)
+                            .testTag("cancel_generation_button"),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Cancel")
+                    }
+                }
+            }
+        }
+
         // Error Banner if any
-        if (imageState.errorMessage != null) {
+        val errorText = processingState.errorMessage ?: imageState.errorMessage
+        if (errorText != null) {
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.errorContainer
@@ -165,7 +268,7 @@ fun CreateScreen(
                         tint = MaterialTheme.colorScheme.error
                     )
                     Text(
-                        text = imageState.errorMessage,
+                        text = errorText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
@@ -173,36 +276,95 @@ fun CreateScreen(
             }
         }
 
-        // Loading State
-        if (imageState.isLoading) {
-            Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
-                ),
-                modifier = Modifier.fillMaxWidth()
+        // Depth Model Status & Import Banner
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            modifier = Modifier.fillMaxWidth().testTag("depth_model_status_card")
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(24.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(28.dp),
-                        strokeWidth = 3.dp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Column {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Psychology,
+                            contentDescription = null,
+                            tint = if (modelStatus.isAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Text(
-                            text = "Loading & Decoding Image...",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            text = "AI Depth Engine (ONNX)",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = if (modelStatus.isAvailable) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer
+                    ) {
+                        Text(
+                            text = if (modelStatus.isAvailable) "Ready" else "Missing Model",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = if (modelStatus.isAvailable) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                if (modelStatus.isAvailable) {
+                    Text(
+                        text = if (modelStatus.isInAssets) "Loaded from app assets (models/depth_model.onnx)."
+                        else "Installed in private storage (${"%.1f".format(modelStatus.fileSizeMb)} MB).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "Depth Anything V2 Small ONNX model is required for local depth inference.",
+                            style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Applying memory-safe downscaling & EXIF orientation",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = "• Option 1: Place depth_model.onnx in assets/models/\n• Option 2: Tap below to import depth_model.onnx from your device storage.",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+
+                    Button(
+                        onClick = {
+                            openModelLauncher.launch(arrayOf("*/*", "application/octet-stream"))
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                            .testTag("btn_import_depth_model"),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FolderOpen,
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Import depth_model.onnx")
                     }
                 }
             }
@@ -301,18 +463,65 @@ fun CreateScreen(
                         }
                     }
 
-                    // Next phase action button (Disabled in Phase 1 as per strict rules)
+                    // Generation Mode Selection Post-Crop
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "Generation Strategy",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        com.example.data.preferences.GenerationMode.entries.forEach { mode ->
+                            val isSelected = appSettings.generationMode == mode
+                            Card(
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                    else MaterialTheme.colorScheme.surfaceContainerHighest
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onGenerationModeChange(mode) }
+                                    .testTag("card_gen_mode_${mode.name.lowercase()}")
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    androidx.compose.material3.RadioButton(
+                                        selected = isSelected,
+                                        onClick = { onGenerationModeChange(mode) }
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = mode.label,
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = mode.description,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Generate PBR Maps Action Button (Phase 2 core feature!)
                     Button(
-                        onClick = { /* Disabled in Phase 1 */ },
-                        enabled = false,
+                        onClick = onGenerateMaps,
+                        enabled = !processingState.isProcessing,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp)
                             .testTag("generate_maps_button"),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
                         Icon(
@@ -322,7 +531,9 @@ fun CreateScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Generate PBR Maps (Coming soon in Phase 2)",
+                            text = if (appSettings.generationMode == com.example.data.preferences.GenerationMode.COMPARE_BOTH)
+                                "Generate & Compare Both Variants"
+                            else "Generate PBR Texture Maps",
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -382,7 +593,7 @@ fun CreateScreen(
                     )
                 }
 
-                // Choose from Gallery Button (System Photo Picker)
+                // Choose from Gallery Button
                 OutlinedButton(
                     onClick = {
                         pickVisualMediaLauncher.launch(
@@ -443,7 +654,7 @@ fun CreateScreen(
                     stage = "2",
                     title = "AI Depth & Normal Maps",
                     subtitle = "ONNX Runtime, Height & Normal Math",
-                    isComplete = false
+                    isComplete = true
                 )
                 PipelineStageRow(
                     stage = "3",

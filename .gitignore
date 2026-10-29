@@ -16,3 +16,11 @@
 local.properties
 .env
 debug.keystore
+
+# Code analysis and graph scratch files
+.coderabbit*
+*coderabbit*
+graphify*
+*graphify*
+*.graph
+*.graphml

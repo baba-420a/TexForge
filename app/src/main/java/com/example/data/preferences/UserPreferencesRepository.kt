@@ -39,10 +39,17 @@ enum class ExportFormat(val extension: String, val label: String) {
     WEBP("webp", "WebP (Modern compressed)")
 }
 
+enum class GenerationMode(val label: String, val description: String) {
+    AI_DEPTH("AI Depth", "Uses bundled Depth Anything V2 Small ONNX model"),
+    FAST("Fast (No AI)", "Multi-scale band-pass luminance height extraction"),
+    COMPARE_BOTH("Compare Both", "Generates both variants for interactive comparison")
+}
+
 data class AppSettings(
     val qualityPreset: QualityPreset = QualityPreset.STANDARD_2048,
     val normalFormat: NormalFormat = NormalFormat.OPEN_GL,
     val enginePreference: EnginePreference = EnginePreference.LOCAL_ONLY,
+    val generationMode: GenerationMode = GenerationMode.AI_DEPTH,
     val heightBitDepth: Int = 16,
     val tileSize: Int = 512,
     val aoSamples: Int = 16,
@@ -52,6 +59,7 @@ data class AppSettings(
     val normalScale4: Float = 0.25f,
     val exportFormat: ExportFormat = ExportFormat.PNG,
     val jpgQuality: Int = 90,
+    val useNnapi: Boolean = false,
     val geminiModel: String = "gemini-2.5-flash-image",
     val hasApiKey: Boolean = false
 )
@@ -64,6 +72,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_QUALITY_PRESET = stringPreferencesKey("quality_preset")
         val KEY_NORMAL_FORMAT = stringPreferencesKey("normal_format")
         val KEY_ENGINE_PREF = stringPreferencesKey("engine_preference")
+        val KEY_GENERATION_MODE = stringPreferencesKey("generation_mode")
         val KEY_HEIGHT_BIT_DEPTH = intPreferencesKey("height_bit_depth")
         val KEY_TILE_SIZE = intPreferencesKey("tile_size")
         val KEY_AO_SAMPLES = intPreferencesKey("ao_samples")
@@ -73,6 +82,7 @@ class UserPreferencesRepository @Inject constructor(
         val KEY_NORMAL_SCALE_4 = floatPreferencesKey("normal_scale_4")
         val KEY_EXPORT_FORMAT = stringPreferencesKey("export_format")
         val KEY_JPG_QUALITY = intPreferencesKey("jpg_quality")
+        val KEY_USE_NNAPI = androidx.datastore.preferences.core.booleanPreferencesKey("use_nnapi")
         val KEY_GEMINI_MODEL = stringPreferencesKey("gemini_model")
         val KEY_ENCRYPTED_API_KEY = stringPreferencesKey("encrypted_api_key")
         val KEY_API_KEY_IV = stringPreferencesKey("api_key_iv")
@@ -91,6 +101,10 @@ class UserPreferencesRepository @Inject constructor(
             runCatching { EnginePreference.valueOf(name) }.getOrNull()
         } ?: EnginePreference.LOCAL_ONLY
 
+        val genMode = prefs[KEY_GENERATION_MODE]?.let { name ->
+            runCatching { GenerationMode.valueOf(name) }.getOrNull()
+        } ?: GenerationMode.AI_DEPTH
+
         val format = prefs[KEY_EXPORT_FORMAT]?.let { name ->
             runCatching { ExportFormat.valueOf(name) }.getOrNull()
         } ?: ExportFormat.PNG
@@ -103,6 +117,7 @@ class UserPreferencesRepository @Inject constructor(
         val s3 = prefs[KEY_NORMAL_SCALE_3] ?: 0.5f
         val s4 = prefs[KEY_NORMAL_SCALE_4] ?: 0.25f
         val jpgQuality = prefs[KEY_JPG_QUALITY] ?: 90
+        val nnapi = prefs[KEY_USE_NNAPI] ?: false
         val geminiModel = prefs[KEY_GEMINI_MODEL] ?: "gemini-2.5-flash-image"
         val hasKey = !prefs[KEY_ENCRYPTED_API_KEY].isNullOrEmpty()
 
@@ -110,6 +125,7 @@ class UserPreferencesRepository @Inject constructor(
             qualityPreset = quality,
             normalFormat = normal,
             enginePreference = engine,
+            generationMode = genMode,
             heightBitDepth = bitDepth,
             tileSize = tileSize,
             aoSamples = aoSamples,
@@ -119,9 +135,18 @@ class UserPreferencesRepository @Inject constructor(
             normalScale4 = s4,
             exportFormat = format,
             jpgQuality = jpgQuality,
+            useNnapi = nnapi,
             geminiModel = geminiModel,
             hasApiKey = hasKey
         )
+    }
+
+    suspend fun updateGenerationMode(mode: GenerationMode) {
+        context.dataStore.edit { it[KEY_GENERATION_MODE] = mode.name }
+    }
+
+    suspend fun updateUseNnapi(enabled: Boolean) {
+        context.dataStore.edit { it[KEY_USE_NNAPI] = enabled }
     }
 
     suspend fun updateQualityPreset(preset: QualityPreset) {

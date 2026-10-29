@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -57,6 +58,11 @@ fun SettingsScreen(
     onNormalScalesChange: (Float, Float, Float, Float) -> Unit,
     onExportFormatChange: (ExportFormat) -> Unit,
     onJpgQualityChange: (Int) -> Unit,
+    onUseNnapiChange: (Boolean) -> Unit,
+    selfTestResult: com.example.engine.DepthModelDiagnosticResult? = null,
+    isSelfTesting: Boolean = false,
+    onRunSelfTest: () -> Unit = {},
+    onClearSelfTest: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -542,6 +548,147 @@ fun SettingsScreen(
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                        }
+                    }
+                }
+            }
+        }
+
+        // ONNX Hardware Acceleration (NNAPI Toggle)
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer
+            ),
+            modifier = Modifier.fillMaxWidth().testTag("nnapi_settings_card")
+        ) {
+            Column(
+                modifier = Modifier.padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = "ONNX Hardware Acceleration",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "By default, ONNX Runtime uses CPU XNNPACK. You can optionally enable Android NNAPI (Neural Networks API) to leverage NPU/GPU hardware acceleration on supported devices.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "NNAPI Execution Provider",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = if (appSettings.useNnapi) "Active (NPU/GPU accelerated)" else "Off (Using multi-threaded CPU XNNPACK)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (appSettings.useNnapi) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    androidx.compose.material3.Switch(
+                        checked = appSettings.useNnapi,
+                        onCheckedChange = onUseNnapiChange,
+                        modifier = Modifier.testTag("switch_nnapi")
+                    )
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+
+                // Self-Test Diagnostic Tool
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Depth Model Diagnostic Self-Test",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "Runs a synthetic 518×518 inference test on the ONNX model to verify session initialization, execution provider stability, latency, and finite array bounds.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    androidx.compose.material3.Button(
+                        onClick = onRunSelfTest,
+                        enabled = !isSelfTesting,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(46.dp)
+                            .testTag("btn_run_depth_self_test"),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        if (isSelfTesting) {
+                            androidx.compose.material3.CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Testing ONNX Model...")
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Tune,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Run Depth Model Self-Test")
+                        }
+                    }
+
+                    if (selfTestResult != null) {
+                        Card(
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (selfTestResult.success) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                                else MaterialTheme.colorScheme.errorContainer
+                            ),
+                            modifier = Modifier.fillMaxWidth().testTag("depth_self_test_results_card")
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = if (selfTestResult.success) "✓ Diagnostic Passed" else "✗ Diagnostic Failed",
+                                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = if (selfTestResult.success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                    )
+                                    Text(
+                                        text = "${selfTestResult.latencyMs} ms",
+                                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Text(
+                                    text = selfTestResult.message,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+
+                                if (selfTestResult.success) {
+                                    Text(
+                                        text = "Output Size: ${selfTestResult.outputPixelCount} floats (518×518)\nFinite Values: ${selfTestResult.isFinite}\nRaw Depth Min/Max: ${"%.3f".format(selfTestResult.minDepth)} / ${"%.3f".format(selfTestResult.maxDepth)}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
                         }
                     }
                 }

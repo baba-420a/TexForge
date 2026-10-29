@@ -31,4 +31,13 @@ object AppModule {
     @Singleton
     fun provideUserPreferencesRepository(context: Context): UserPreferencesRepository =
         UserPreferencesRepository(context)
+
+    @Provides
+    @Singleton
+    fun provideMapProcessor(): com.example.engine.MapProcessor = com.example.engine.CpuMapProcessor()
+
+    @Provides
+    @Singleton
+    fun provideOnnxDepthEngine(context: Context): com.example.engine.OnnxDepthEngine =
+        com.example.engine.OnnxDepthEngine(context)
 }
