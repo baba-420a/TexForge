@@ -63,6 +63,7 @@ class MainActivity : Hilt_MainActivity() {
                 val selfTestResult by viewModel.selfTestResult.collectAsStateWithLifecycle()
                 val isSelfTesting by viewModel.isSelfTesting.collectAsStateWithLifecycle()
                 val modelStatus by viewModel.modelStatus.collectAsStateWithLifecycle()
+                val projectsList by viewModel.projectsList.collectAsStateWithLifecycle()
 
                 // Keep screen on during heavy processing
                 DisposableEffect(processingState.isProcessing) {
@@ -166,6 +167,18 @@ class MainActivity : Hilt_MainActivity() {
                                 }
                             }
                             HistoryScreen(
+                                projects = projectsList,
+                                onToggleFavorite = { viewModel.toggleProjectFavorite(it) },
+                                onDeleteProject = { viewModel.deleteProjectFromHistory(it) },
+                                onNavigateToCreate = {
+                                    navController.navigate(Screen.Create.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
                                 modifier = Modifier.fillMaxSize()
                             )
                         }

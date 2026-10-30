@@ -23,14 +23,26 @@ jobs:
           java-version: '21'
           cache: 'gradle'
 
-      - name: Grant Execute Permission for Gradlew
-        run: chmod +x gradlew
-
-      - name: Run Unit Tests
-        run: ./gradlew testDebugUnitTest --no-daemon
-
-      - name: Setup Keystore
+      - name: Grant Execute Permission for Gradlew & Fix Line Endings
         run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
+
+      - name: Ensure .env File Exists
+        run: |
+          if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+            cp .env.example .env
+          elif [ ! -f ".env" ]; then
+            touch .env
+          fi
+
+      - name: Setup Keystores
+        run: |
+          if [ -f "debug.keystore.base64" ] && [ ! -f "debug.keystore" ]; then
+            echo "Decoding debug.keystore from debug.keystore.base64..."
+            base64 -d debug.keystore.base64 > debug.keystore
+          fi
+
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "Decoding release keystore from KEYSTORE_BASE64 secret..."
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > my-upload-key.jks
@@ -51,10 +63,13 @@ jobs:
           STORE_PASS: ${{ secrets.STORE_PASSWORD || 'android' }}
           KEY_PASS: ${{ secrets.KEY_PASSWORD || 'android' }}
 
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
       - name: Build APKs
         run: ./gradlew assembleRelease assembleDebug --stacktrace --no-daemon
         env:
-          KEYSTORE_PATH: my-upload-key.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/my-upload-key.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD || 'android' }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS || 'upload' }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD || 'android' }}

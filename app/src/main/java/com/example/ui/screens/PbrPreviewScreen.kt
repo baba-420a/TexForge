@@ -78,6 +78,7 @@ import com.example.engine.gl.PbrGlRenderer
 import com.example.engine.gl.PreviewMeshType
 import com.example.ui.GeneratedMapState
 import com.example.ui.preview3d.PbrPreviewView
+import com.example.ui.components.ExportBottomSheet
 
 enum class LightingPreset(val displayName: String, val icon: ImageVector, val angle: Float, val intensity: Float) {
     STUDIO("Studio", Icons.Default.WbIncandescent, 135f, 2.5f),
@@ -114,6 +115,7 @@ fun PbrPreviewScreen(
     var currentNormalFormat by remember { mutableStateOf(normalFormat) }
     var activeEnv by remember { mutableStateOf(LightingPreset.STUDIO) }
     var showAdjustSheet by remember { mutableStateOf(false) }
+    var showExportSheet by remember { mutableStateOf(false) }
 
     // Resolve state based on selected variant
     val effectiveState = when {
@@ -481,38 +483,47 @@ fun PbrPreviewScreen(
                 }
             }
 
-            // Pinned Primary Export Button (Coming in Phase 7)
+            // Primary Export Button
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
                 Button(
-                    onClick = { /* Export planned in Phase 7 */ },
-                    enabled = false,
+                    onClick = { showExportSheet = true },
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
-                        disabledContainerColor = Color.Transparent,
-                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.primary
                     ),
                     modifier = Modifier.fillMaxSize().testTag("btn_export_zip")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Download,
                         contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Export Material Maps (Coming in Phase 7)",
-                        style = MaterialTheme.typography.labelLarge
+                        text = "Export Material PBR Maps",
+                        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
         }
+    }
+
+    // Export Material Modal Bottom Sheet
+    if (showExportSheet) {
+        ExportBottomSheet(
+            generatedState = effectiveState,
+            onDismiss = { showExportSheet = false }
+        )
     }
 
     // Adjust Material Parameters Bottom Sheet

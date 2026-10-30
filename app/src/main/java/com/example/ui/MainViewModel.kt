@@ -5,6 +5,8 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.data.local.dao.ProjectDao
+import com.example.data.local.entity.ProjectEntity
 import com.example.data.preferences.AppSettings
 import com.example.data.preferences.EnginePreference
 import com.example.data.preferences.ExportFormat
@@ -105,7 +107,8 @@ data class ModelStatus(
 class MainViewModel @Inject constructor(
     private val preferencesRepository: UserPreferencesRepository,
     private val onnxDepthEngine: OnnxDepthEngine,
-    private val mapProcessor: MapProcessor
+    private val mapProcessor: MapProcessor,
+    private val projectDao: ProjectDao
 ) : ViewModel() {
 
     val appSettings: StateFlow<AppSettings> = preferencesRepository.appSettingsFlow
@@ -113,6 +116,13 @@ class MainViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = AppSettings()
+        )
+
+    val projectsList: StateFlow<List<ProjectEntity>> = projectDao.getAllProjects()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
         )
 
     private val _imageState = MutableStateFlow(ImageInputState())
@@ -438,6 +448,24 @@ class MainViewModel @Inject constructor(
                     GenerationMode.AI_DEPTH -> aiResultState
                     GenerationMode.FAST -> fastResultState
                     GenerationMode.COMPARE_BOTH -> aiResultState ?: fastResultState
+                }
+
+                // Automatically persist generated material project into Room database
+                val projectTitle = "PBR Material #${(System.currentTimeMillis() % 10000)}"
+                viewModelScope.launch(Dispatchers.IO) {
+                    try {
+                        projectDao.insertProject(
+                            ProjectEntity(
+                                name = projectTitle,
+                                createdAt = System.currentTimeMillis(),
+                                resolution = settings.qualityPreset.maxResolution,
+                                mapsCount = 8,
+                                isFavorite = false,
+                                generationMode = genMode.name,
+                                isSeamless = isSeamless
+                            )
+                        )
+                    } catch (_: Exception) {}
                 }
 
                 _processingState.value = ProcessingState(isProcessing = false)
@@ -922,5 +950,18 @@ class MainViewModel @Inject constructor(
 
     fun setUseNnapi(enabled: Boolean) {
         viewModelScope.launch { preferencesRepository.updateUseNnapi(enabled) }
+    }
+
+    // Room History Management
+    fun toggleProjectFavorite(project: ProjectEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            projectDao.updateFavoriteStatus(project.id, !project.isFavorite)
+        }
+    }
+
+    fun deleteProjectFromHistory(project: ProjectEntity) {
+        viewModelScope.launch(Dispatchers.IO) {
+            projectDao.deleteProject(project)
+        }
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Sort
@@ -35,6 +36,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -54,18 +57,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-data class HistoryItem(
-    val id: String,
-    val title: String,
-    val mapsCount: Int,
-    val resolution: String,
-    val dateLabel: String,
-    val isFavorite: Boolean
-)
+import com.example.data.local.entity.ProjectEntity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun HistoryScreen(
+    projects: List<ProjectEntity> = emptyList(),
+    onToggleFavorite: (ProjectEntity) -> Unit = {},
+    onDeleteProject: (ProjectEntity) -> Unit = {},
     onNavigateToCreate: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -74,19 +75,19 @@ fun HistoryScreen(
 
     val sampleProjects = remember {
         listOf(
-            HistoryItem("1", "Dark Granite", 8, "2K PBR", "Today, 14:20", true),
-            HistoryItem("2", "Old Brick Wall", 8, "2K PBR", "Yesterday", false),
-            HistoryItem("3", "Rough Slate Rock", 8, "4K PBR", "May 12", true),
-            HistoryItem("4", "Oak Bark", 8, "2K PBR", "May 08", false),
-            HistoryItem("5", "Weathered Concrete", 8, "2K PBR", "Apr 29", false),
-            HistoryItem("6", "Charcoal Basalt", 8, "4K PBR", "Apr 22", true)
+            ProjectEntity(id = 101, name = "Dark Granite", resolution = 2048, mapsCount = 8, isFavorite = true),
+            ProjectEntity(id = 102, name = "Old Brick Wall", resolution = 2048, mapsCount = 8, isFavorite = false),
+            ProjectEntity(id = 103, name = "Rough Slate Rock", resolution = 4096, mapsCount = 8, isFavorite = true),
+            ProjectEntity(id = 104, name = "Oak Bark", resolution = 2048, mapsCount = 8, isFavorite = false)
         )
     }
 
+    val activeList = if (projects.isNotEmpty()) projects else sampleProjects
+
     val displayedProjects = if (selectedFilter == "fav") {
-        sampleProjects.filter { it.isFavorite }
+        activeList.filter { it.isFavorite }
     } else {
-        sampleProjects
+        activeList
     }
 
     Column(
@@ -254,6 +255,7 @@ fun HistoryScreen(
                             }
                         }
 
+                        val favCount = activeList.count { it.isFavorite }
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = if (selectedFilter == "fav") MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
@@ -272,7 +274,7 @@ fun HistoryScreen(
                                     color = if (selectedFilter == "fav") MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                                 Text(
-                                    text = "3",
+                                    text = "$favCount",
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                 )
@@ -391,7 +393,11 @@ fun HistoryScreen(
                 ) {
                     items(displayedProjects.size) { index ->
                         val project = displayedProjects[index]
-                        ProjectCard(project = project)
+                        ProjectCard(
+                            project = project,
+                            onToggleFavorite = { onToggleFavorite(project) },
+                            onDelete = { onDeleteProject(project) }
+                        )
                     }
                 }
             }
@@ -400,12 +406,31 @@ fun HistoryScreen(
 }
 
 @Composable
-private fun ProjectCard(project: HistoryItem) {
+private fun ProjectCard(
+    project: ProjectEntity,
+    onToggleFavorite: () -> Unit,
+    onDelete: () -> Unit
+) {
+    var showMenu by remember { mutableStateOf(false) }
+
+    val formattedDate = remember(project.createdAt) {
+        val sdf = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault())
+        sdf.format(Date(project.createdAt))
+    }
+
+    val resLabel = remember(project.resolution) {
+        when {
+            project.resolution >= 4096 -> "4K PBR"
+            project.resolution >= 2048 -> "2K PBR"
+            else -> "1K PBR"
+        }
+    }
+
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().testTag("history_item_card_${project.id}")
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
@@ -419,16 +444,15 @@ private fun ProjectCard(project: HistoryItem) {
                     .clip(RoundedCornerShape(10.dp))
                     .background(MaterialTheme.colorScheme.surfaceContainerLow)
             ) {
-                // Geometric simulated surface background
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            when (project.id) {
-                                "1" -> Color(0xFF2E3440)
-                                "2" -> Color(0xFF4A3428)
-                                "3" -> Color(0xFF1E222A)
-                                "4" -> Color(0xFF3B2F2F)
+                            when ((project.id % 5).toInt()) {
+                                0 -> Color(0xFF2E3440)
+                                1 -> Color(0xFF4A3428)
+                                2 -> Color(0xFF1E222A)
+                                3 -> Color(0xFF3B2F2F)
                                 else -> Color(0xFF282C34)
                             }
                         ),
@@ -442,7 +466,7 @@ private fun ProjectCard(project: HistoryItem) {
                     )
                 }
 
-                // Favorite Star
+                // Favorite Star Button
                 Surface(
                     shape = CircleShape,
                     color = MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.85f),
@@ -450,11 +474,13 @@ private fun ProjectCard(project: HistoryItem) {
                         .align(Alignment.TopEnd)
                         .padding(6.dp)
                         .size(28.dp)
+                        .clickable { onToggleFavorite() }
+                        .testTag("history_fav_btn_${project.id}")
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = if (project.isFavorite) Icons.Default.Star else Icons.Outlined.StarBorder,
-                            contentDescription = null,
+                            contentDescription = "Favorite",
                             tint = if (project.isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(16.dp)
                         )
@@ -470,7 +496,7 @@ private fun ProjectCard(project: HistoryItem) {
                         .padding(6.dp)
                 ) {
                     Text(
-                        text = project.resolution,
+                        text = resLabel,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold),
                         color = MaterialTheme.colorScheme.onSurface,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -485,18 +511,45 @@ private fun ProjectCard(project: HistoryItem) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = project.title,
+                        text = project.name,
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         modifier = Modifier.weight(1f)
                     )
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp)
-                    )
+                    Box {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.size(24.dp).testTag("history_menu_btn_${project.id}")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Menu",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = showMenu,
+                            onDismissRequest = { showMenu = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Delete", color = MaterialTheme.colorScheme.error) },
+                                onClick = {
+                                    showMenu = false
+                                    onDelete()
+                                },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            )
+                        }
+                    }
                 }
 
                 Row(
@@ -510,7 +563,7 @@ private fun ProjectCard(project: HistoryItem) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = project.dateLabel,
+                        text = formattedDate,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
