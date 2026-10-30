@@ -101,6 +101,8 @@ class MainActivity : Hilt_MainActivity() {
                             viewModel.updateNoise(scale, octaves, intensity, blendWeight)
                         },
                         onSwitchVariant = { viewModel.switchVariant(it) },
+                        onToggle2x2Tiled = { viewModel.toggle2x2TiledView() },
+                        onApplySeamless = { enabled, margin -> viewModel.applySeamlessTiling(enabled, margin) },
                         onBackToCreate = { viewModel.clearResults() },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -145,7 +147,8 @@ class MainActivity : Hilt_MainActivity() {
                                 onClearImage = { viewModel.clearImage() },
                                 onImportModel = { viewModel.importDepthModel(it) },
                                 onGenerationModeChange = { viewModel.setGenerationMode(it) },
-                                onGenerateMaps = { viewModel.generatePbrMaps() },
+                                onMaskChanged = { viewModel.setExclusionMask(it) },
+                                onGenerateMaps = { isSeamless -> viewModel.generatePbrMaps(isSeamless = isSeamless) },
                                 onCancelGeneration = { viewModel.cancelGeneration() },
                                 modifier = Modifier.fillMaxSize()
                             )

@@ -25,12 +25,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Check
@@ -88,6 +90,7 @@ import com.example.data.preferences.QualityPreset
 import com.example.ui.ImageInputState
 import com.example.ui.ModelStatus
 import com.example.ui.ProcessingState
+import com.example.ui.components.MaskCanvasView
 import com.example.ui.components.SquareCropView
 
 @Composable
@@ -105,7 +108,8 @@ fun CreateScreen(
     onClearImage: () -> Unit,
     onImportModel: (Uri) -> Unit,
     onGenerationModeChange: (GenerationMode) -> Unit = {},
-    onGenerateMaps: () -> Unit,
+    onMaskChanged: (Bitmap?) -> Unit = {},
+    onGenerateMaps: (Boolean) -> Unit = {},
     onCancelGeneration: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -224,13 +228,15 @@ fun CreateScreen(
                     }
                 )
             } else {
-                // STATE 2: Material Inspector & Options Screen (matches generate_options/code.html)
+                // STATE 2: Material Inspector & Options Screen (matches mask/code.html and generate_options/code.html)
                 GenerateOptionsScreen(
                     bitmap = imageState.croppedBitmap,
+                    initialMask = imageState.exclusionMaskBitmap,
                     appSettings = appSettings,
                     onReCrop = onReCrop,
                     onClearImage = onClearImage,
                     onGenerationModeChange = onGenerationModeChange,
+                    onMaskChanged = onMaskChanged,
                     onGenerate = onGenerateMaps
                 )
             }
@@ -628,20 +634,89 @@ private fun SpecPill(
 }
 
 /**
- * Generate Options & Material Inspector Screen matching generate_options/code.html
+ * Generate Options & Material Inspector Screen matching mask/code.html & generate_options/code.html
  */
 @Composable
 private fun GenerateOptionsScreen(
     bitmap: Bitmap,
+    initialMask: Bitmap? = null,
     appSettings: AppSettings,
     onReCrop: () -> Unit,
     onClearImage: () -> Unit,
     onGenerationModeChange: (GenerationMode) -> Unit,
-    onGenerate: () -> Unit
+    onMaskChanged: (Bitmap?) -> Unit,
+    onGenerate: (Boolean) -> Unit
 ) {
     var isSeamless by remember { mutableStateOf(true) }
 
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // Segmented Mode Selector: [ Crop | Mask ] (Matches mask/code.html lines 6-15)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Surface(
+                shape = RoundedCornerShape(999.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier
+                    .widthIn(max = 280.dp)
+                    .fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    // Crop mode button
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = Color.Transparent,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp)
+                            .clickable { onReCrop() }
+                            .testTag("tab_crop")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "Crop",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    // Mask mode button (active)
+                    Surface(
+                        shape = RoundedCornerShape(999.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(34.dp)
+                            .testTag("tab_mask")
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                text = "Mask",
+                                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Interactive Material Inspector & Blemish Exclusion Viewport (Matches mask/code.html lines 16-95)
+        MaskCanvasView(
+            sourceBitmap = bitmap,
+            initialMask = initialMask,
+            onMaskUpdated = onMaskChanged,
+            modifier = Modifier.fillMaxWidth()
+        )
+
         // Source Image Thumbnail Strip
         Surface(
             shape = RoundedCornerShape(12.dp),
@@ -919,7 +994,7 @@ private fun GenerateOptionsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
-                onClick = onGenerate,
+                onClick = { onGenerate(isSeamless) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
@@ -930,15 +1005,15 @@ private fun GenerateOptionsScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 )
             ) {
-                Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
+                Text(
+                    text = "Next",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Generate",
-                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 

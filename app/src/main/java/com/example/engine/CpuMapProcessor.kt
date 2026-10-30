@@ -745,4 +745,399 @@ class CpuMapProcessor : MapProcessor {
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
         bitmap
     }
+
+    override suspend fun makeSeamlessBitmap(
+        source: Bitmap,
+        blendMarginRatio: Float
+    ): Bitmap = withContext(Dispatchers.Default) {
+        val width = source.width
+        val height = source.height
+        val total = width * height
+        val pixels = IntArray(total)
+        source.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        val r = FloatArray(total)
+        val g = FloatArray(total)
+        val b = FloatArray(total)
+        val a = IntArray(total)
+
+        for (i in 0 until total) {
+            val p = pixels[i]
+            a[i] = (p ushr 24) and 0xFF
+            r[i] = ((p ushr 16) and 0xFF).toFloat()
+            g[i] = ((p ushr 8) and 0xFF).toFloat()
+            b[i] = (p and 0xFF).toFloat()
+        }
+
+        val marginX = (width * blendMarginRatio.coerceIn(0.10f, 0.50f)).roundToInt().coerceIn(4, width / 2)
+        val marginY = (height * blendMarginRatio.coerceIn(0.10f, 0.50f)).roundToInt().coerceIn(4, height / 2)
+
+        // Pass 1: Horizontal boundary reconciliation across left & right margins
+        for (y in 0 until height) {
+            val rowOffset = y * width
+            val rightIdx = rowOffset + width - 1
+            val leftIdx = rowOffset
+            val deltaR = r[rightIdx] - r[leftIdx]
+            val deltaG = g[rightIdx] - g[leftIdx]
+            val deltaB = b[rightIdx] - b[leftIdx]
+
+            for (x in 0 until marginX) {
+                val t = 0.5f * (1.0f - Math.cos(Math.PI * x / (2.0 * marginX))).toFloat()
+                val factor = 0.5f - t
+                val idx = rowOffset + x
+                r[idx] += factor * deltaR
+                g[idx] += factor * deltaG
+                b[idx] += factor * deltaB
+            }
+            for (x in 0 until marginX) {
+                val xR = width - marginX + x
+                val t = 0.5f * (1.0f - Math.cos(Math.PI * (x + marginX) / (2.0 * marginX))).toFloat()
+                val factor = t - 0.5f
+                val idx = rowOffset + xR
+                r[idx] -= factor * deltaR
+                g[idx] -= factor * deltaG
+                b[idx] -= factor * deltaB
+            }
+        }
+
+        // Pass 2: Vertical boundary reconciliation across top & bottom margins
+        for (x in 0 until width) {
+            val bottomIdx = (height - 1) * width + x
+            val topIdx = x
+            val deltaR = r[bottomIdx] - r[topIdx]
+            val deltaG = g[bottomIdx] - g[topIdx]
+            val deltaB = b[bottomIdx] - b[topIdx]
+
+            for (y in 0 until marginY) {
+                val t = 0.5f * (1.0f - Math.cos(Math.PI * y / (2.0 * marginY))).toFloat()
+                val factor = 0.5f - t
+                val idx = y * width + x
+                r[idx] += factor * deltaR
+                g[idx] += factor * deltaG
+                b[idx] += factor * deltaB
+            }
+            for (y in 0 until marginY) {
+                val yB = height - marginY + y
+                val t = 0.5f * (1.0f - Math.cos(Math.PI * (y + marginY) / (2.0 * marginY))).toFloat()
+                val factor = t - 0.5f
+                val idx = yB * width + x
+                r[idx] -= factor * deltaR
+                g[idx] -= factor * deltaG
+                b[idx] -= factor * deltaB
+            }
+        }
+
+        val outPixels = IntArray(total)
+        for (i in 0 until total) {
+            val red = r[i].roundToInt().coerceIn(0, 255)
+            val green = g[i].roundToInt().coerceIn(0, 255)
+            val blue = b[i].roundToInt().coerceIn(0, 255)
+            outPixels[i] = (a[i] shl 24) or (red shl 16) or (green shl 8) or blue
+        }
+
+        val resultBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        resultBitmap.setPixels(outPixels, 0, width, 0, 0, width, height)
+        resultBitmap
+    }
+
+    override suspend fun makeSeamlessFloatMap(
+        map: FloatArray,
+        width: Int,
+        height: Int,
+        blendMarginRatio: Float
+    ): FloatArray = withContext(Dispatchers.Default) {
+        val outMap = map.copyOf()
+        val marginX = (width * blendMarginRatio.coerceIn(0.10f, 0.50f)).roundToInt().coerceIn(4, width / 2)
+        val marginY = (height * blendMarginRatio.coerceIn(0.10f, 0.50f)).roundToInt().coerceIn(4, height / 2)
+
+        // Pass 1: Horizontal boundary reconciliation
+        for (y in 0 until height) {
+            val rowOffset = y * width
+            val deltaH = outMap[rowOffset + width - 1] - outMap[rowOffset]
+
+            for (x in 0 until marginX) {
+                val t = 0.5f * (1.0f - Math.cos(Math.PI * x / (2.0 * marginX))).toFloat()
+                outMap[rowOffset + x] += (0.5f - t) * deltaH
+            }
+            for (x in 0 until marginX) {
+                val xR = width - marginX + x
+                val t = 0.5f * (1.0f - Math.cos(Math.PI * (x + marginX) / (2.0 * marginX))).toFloat()
+                outMap[rowOffset + xR] -= (t - 0.5f) * deltaH
+            }
+        }
+
+        // Pass 2: Vertical boundary reconciliation
+        for (x in 0 until width) {
+            val deltaV = outMap[(height - 1) * width + x] - outMap[x]
+
+            for (y in 0 until marginY) {
+                val t = 0.5f * (1.0f - Math.cos(Math.PI * y / (2.0 * marginY))).toFloat()
+                outMap[y * width + x] += (0.5f - t) * deltaV
+            }
+            for (y in 0 until marginY) {
+                val yB = height - marginY + y
+                val t = 0.5f * (1.0f - Math.cos(Math.PI * (y + marginY) / (2.0 * marginY))).toFloat()
+                outMap[yB * width + x] -= (t - 0.5f) * deltaV
+            }
+        }
+
+        outMap
+    }
+
+    override suspend fun analyzeSeamContinuity(
+        source: Bitmap
+    ): SeamAnalysisResult = withContext(Dispatchers.Default) {
+        val width = source.width
+        val height = source.height
+        val pixels = IntArray(width * height)
+        source.getPixels(pixels, 0, width, 0, 0, width, height)
+
+        var totalHDiff = 0.0
+        var totalVDiff = 0.0
+        var maxDiff = 0.0f
+
+        // Horizontal seam: compare left col (x = 0) to right col (x = width - 1)
+        for (y in 0 until height) {
+            val left = pixels[y * width]
+            val right = pixels[y * width + (width - 1)]
+
+            val lr = (left ushr 16) and 0xFF
+            val lg = (left ushr 8) and 0xFF
+            val lb = left and 0xFF
+
+            val rr = (right ushr 16) and 0xFF
+            val rg = (right ushr 8) and 0xFF
+            val rb = right and 0xFF
+
+            val dr = (lr - rr) / 255.0f
+            val dg = (lg - rg) / 255.0f
+            val db = (lb - rb) / 255.0f
+
+            val diff = sqrt((dr * dr + dg * dg + db * db) / 3.0f)
+            totalHDiff += (diff * diff)
+            if (diff > maxDiff) maxDiff = diff
+        }
+
+        // Vertical seam: compare top row (y = 0) to bottom row (y = height - 1)
+        val bottomRowOffset = (height - 1) * width
+        for (x in 0 until width) {
+            val top = pixels[x]
+            val bottom = pixels[bottomRowOffset + x]
+
+            val tr = (top ushr 16) and 0xFF
+            val tg = (top ushr 8) and 0xFF
+            val tb = top and 0xFF
+
+            val br = (bottom ushr 16) and 0xFF
+            val bg = (bottom ushr 8) and 0xFF
+            val bb = bottom and 0xFF
+
+            val dr = (tr - br) / 255.0f
+            val dg = (tg - bg) / 255.0f
+            val db = (tb - bb) / 255.0f
+
+            val diff = sqrt((dr * dr + dg * dg + db * db) / 3.0f)
+            totalVDiff += (diff * diff)
+            if (diff > maxDiff) maxDiff = diff
+        }
+
+        val rmsH = sqrt(totalHDiff / height).toFloat()
+        val rmsV = sqrt(totalVDiff / width).toFloat()
+        val combinedDiscontinuity = (rmsH + rmsV) / 2.0f
+        val continuityPercent = ((1.0f - combinedDiscontinuity).coerceIn(0.0f, 1.0f)) * 100.0f
+
+        SeamAnalysisResult(
+            seamDiscontinuityScore = combinedDiscontinuity,
+            continuityPercent = continuityPercent,
+            horizontalSeamError = rmsH,
+            verticalSeamError = rmsV,
+            maxEdgeDiscontinuity = maxDiff,
+            isSeamless = continuityPercent >= 88.0f
+        )
+    }
+
+    override suspend fun applyExclusionMask(
+        heightMap: FloatArray,
+        maskBitmap: Bitmap?,
+        width: Int,
+        height: Int,
+        iterations: Int
+    ): FloatArray = withContext(Dispatchers.Default) {
+        if (maskBitmap == null) {
+            return@withContext heightMap.copyOf()
+        }
+
+        val totalPixels = width * height
+        val mask = BooleanArray(totalPixels)
+        val maskWidth = maskBitmap.width
+        val maskHeight = maskBitmap.height
+        val maskPixels = IntArray(maskWidth * maskHeight)
+        maskBitmap.getPixels(maskPixels, 0, maskWidth, 0, 0, maskWidth, maskHeight)
+
+        var hasMaskedPixels = false
+        val scaleX = maskWidth.toFloat() / width.toFloat()
+        val scaleY = maskHeight.toFloat() / height.toFloat()
+
+        for (y in 0 until height) {
+            val my = ((y + 0.5f) * scaleY).toInt().coerceIn(0, maskHeight - 1)
+            val myOffset = my * maskWidth
+            val yOffset = y * width
+            for (x in 0 until width) {
+                val mx = ((x + 0.5f) * scaleX).toInt().coerceIn(0, maskWidth - 1)
+                val pixel = maskPixels[myOffset + mx]
+                val alpha = (pixel ushr 24) and 0xFF
+                val red = (pixel ushr 16) and 0xFF
+                // Mask pixel if drawn with semi-transparent red or active alpha
+                val isMasked = alpha > 30 && (red > 40 || alpha > 60)
+                if (isMasked) {
+                    mask[yOffset + x] = true
+                    hasMaskedPixels = true
+                }
+            }
+        }
+
+        if (!hasMaskedPixels) {
+            return@withContext heightMap.copyOf()
+        }
+
+        inpaintHeightMap(heightMap, mask, width, height, iterations)
+    }
+
+    override suspend fun inpaintHeightMap(
+        heightMap: FloatArray,
+        mask: BooleanArray,
+        width: Int,
+        height: Int,
+        iterations: Int
+    ): FloatArray = withContext(Dispatchers.Default) {
+        val totalPixels = width * height
+        var maskedCount = 0
+        for (i in 0 until totalPixels) {
+            if (mask[i]) maskedCount++
+        }
+        if (maskedCount == 0 || maskedCount == totalPixels) {
+            return@withContext heightMap.copyOf()
+        }
+
+        val result = heightMap.copyOf()
+
+        // 1. Gather all boundary unmasked neighbor heights to initialize the interior smoothly
+        var boundarySum = 0.0
+        var boundaryCount = 0
+        val isBoundary = BooleanArray(totalPixels)
+
+        for (y in 0 until height) {
+            val yOffset = y * width
+            for (x in 0 until width) {
+                val idx = yOffset + x
+                if (mask[idx]) {
+                    // Check 4 neighbors
+                    var touchesUnmasked = false
+                    if (x > 0 && !mask[idx - 1]) touchesUnmasked = true
+                    if (x < width - 1 && !mask[idx + 1]) touchesUnmasked = true
+                    if (y > 0 && !mask[idx - width]) touchesUnmasked = true
+                    if (y < height - 1 && !mask[idx + width]) touchesUnmasked = true
+
+                    if (touchesUnmasked) {
+                        isBoundary[idx] = true
+                        var localSum = 0f
+                        var localCnt = 0
+                        if (x > 0 && !mask[idx - 1]) { localSum += result[idx - 1]; localCnt++ }
+                        if (x < width - 1 && !mask[idx + 1]) { localSum += result[idx + 1]; localCnt++ }
+                        if (y > 0 && !mask[idx - width]) { localSum += result[idx - width]; localCnt++ }
+                        if (y < height - 1 && !mask[idx + width]) { localSum += result[idx + width]; localCnt++ }
+                        if (localCnt > 0) {
+                            val avg = localSum / localCnt
+                            result[idx] = avg
+                            boundarySum += avg
+                            boundaryCount++
+                        }
+                    }
+                }
+            }
+        }
+
+        // Initialize non-boundary masked pixels to the mean boundary value
+        val initialFill = if (boundaryCount > 0) (boundarySum / boundaryCount).toFloat() else 0.5f
+        for (i in 0 until totalPixels) {
+            if (mask[i] && !isBoundary[i]) {
+                result[i] = initialFill
+            }
+        }
+
+        // 2. Perform N iterations of harmonic relaxation (discrete Laplacian smoothing on masked pixels)
+        var currentBuffer = result
+        var nextBuffer = result.copyOf()
+
+        val numCores = Runtime.getRuntime().availableProcessors().coerceIn(2, 8)
+        val rowsPerChunk = (height + numCores - 1) / numCores
+
+        for (iter in 0 until iterations) {
+            coroutineScope {
+                (0 until numCores).map { chunkIndex ->
+                    async {
+                        val startY = chunkIndex * rowsPerChunk
+                        val endY = min(height, startY + rowsPerChunk)
+                        for (y in startY until endY) {
+                            val yOffset = y * width
+                            for (x in 0 until width) {
+                                val idx = yOffset + x
+                                if (mask[idx]) {
+                                    val left = if (x > 0) currentBuffer[idx - 1] else currentBuffer[idx]
+                                    val right = if (x < width - 1) currentBuffer[idx + 1] else currentBuffer[idx]
+                                    val top = if (y > 0) currentBuffer[idx - width] else currentBuffer[idx]
+                                    val bottom = if (y < height - 1) currentBuffer[idx + width] else currentBuffer[idx]
+                                    nextBuffer[idx] = (left + right + top + bottom) * 0.25f
+                                }
+                            }
+                        }
+                    }
+                }.awaitAll()
+            }
+            // Swap buffers
+            val temp = currentBuffer
+            currentBuffer = nextBuffer
+            nextBuffer = temp
+        }
+
+        // Coerce output within [0.0, 1.0] and clean any NaN/Infs
+        for (i in 0 until totalPixels) {
+            val v = currentBuffer[i]
+            if (v.isNaN() || v.isInfinite()) {
+                currentBuffer[i] = 0.5f
+            } else {
+                currentBuffer[i] = v.coerceIn(0.0f, 1.0f)
+            }
+        }
+
+        currentBuffer
+    }
+
+    override suspend fun generate2x2TiledBitmap(
+        source: Bitmap
+    ): Bitmap = withContext(Dispatchers.Default) {
+        val w = source.width
+        val h = source.height
+        val srcPixels = IntArray(w * h)
+        source.getPixels(srcPixels, 0, w, 0, 0, w, h)
+
+        val outW = w * 2
+        val outH = h * 2
+        val outPixels = IntArray(outW * outH)
+
+        for (y in 0 until outH) {
+            val srcY = y % h
+            val srcRowOffset = srcY * w
+            val outRowOffset = y * outW
+
+            for (x in 0 until outW) {
+                val srcX = x % w
+                outPixels[outRowOffset + x] = srcPixels[srcRowOffset + srcX]
+            }
+        }
+
+        val result = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+        result.setPixels(outPixels, 0, outW, 0, 0, outW, outH)
+        result
+    }
 }

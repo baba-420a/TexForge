@@ -32,6 +32,7 @@ import javax.inject.Inject
 data class ImageInputState(
     val sourceBitmap: Bitmap? = null,
     val croppedBitmap: Bitmap? = null,
+    val exclusionMaskBitmap: Bitmap? = null,
     val isCropping: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null
@@ -74,7 +75,15 @@ data class GeneratedMapState(
     val noiseScale: Float = 8.0f,
     val noiseOctaves: Int = 4,
     val noiseIntensity: Float = 1.0f,
-    val blendNoiseIntoHeight: Float = 0.0f
+    val blendNoiseIntoHeight: Float = 0.0f,
+    // Seamless Tiling & Seam Synthesis (Phase 5)
+    val isSeamless: Boolean = false,
+    val seamAnalysis: com.example.engine.SeamAnalysisResult? = null,
+    val tiled2x2Bitmap: Bitmap? = null,
+    val show2x2Tiled: Boolean = false,
+    val seamlessBlendMargin: Float = 0.20f,
+    // Blemish Exclusion Mask (Phase 6)
+    val exclusionMaskBitmap: Bitmap? = null
 )
 
 data class ProcessingState(
@@ -265,8 +274,13 @@ class MainViewModel @Inject constructor(
     fun onCropConfirmed(cropped: Bitmap) {
         _imageState.value = _imageState.value.copy(
             croppedBitmap = cropped,
+            exclusionMaskBitmap = null,
             isCropping = false
         )
+    }
+
+    fun setExclusionMask(maskBitmap: Bitmap?) {
+        _imageState.value = _imageState.value.copy(exclusionMaskBitmap = maskBitmap)
     }
 
     fun onCancelCrop() {
@@ -298,7 +312,7 @@ class MainViewModel @Inject constructor(
     /**
      * Executes PBR map generation pipeline according to selected GenerationMode.
      */
-    fun generatePbrMaps() {
+    fun generatePbrMaps(isSeamless: Boolean = false, blendMargin: Float = 0.20f) {
         val cropped = _imageState.value.croppedBitmap ?: return
 
         val settings = appSettings.value
@@ -320,7 +334,7 @@ class MainViewModel @Inject constructor(
             _processingState.value = ProcessingState(
                 isProcessing = true,
                 progressPercent = 5,
-                currentStep = "Initializing PBR Pipeline (${genMode.label})...",
+                currentStep = "Initializing PBR Pipeline (${genMode.label})${if (isSeamless) " [Seamless Tiling]" else ""}...",
                 errorMessage = null
             )
 
@@ -371,7 +385,7 @@ class MainViewModel @Inject constructor(
 
                     _processingState.value = _processingState.value.copy(
                         progressPercent = 60,
-                        currentStep = "Building AI Depth PBR Maps..."
+                        currentStep = if (isSeamless) "Synthesizing Seamless AI Depth PBR Maps..." else "Building AI Depth PBR Maps..."
                     )
 
                     aiResultState = buildPbrMapSet(
@@ -380,7 +394,10 @@ class MainViewModel @Inject constructor(
                         baseDepthMap = upscaledDepth,
                         highPassLum = highPassLum,
                         targetResolution = targetResolution,
-                        settings = settings
+                        settings = settings,
+                        isSeamless = isSeamless,
+                        seamlessBlendMargin = blendMargin,
+                        exclusionMaskBitmap = _imageState.value.exclusionMaskBitmap
                     )
                 }
 
@@ -397,7 +414,7 @@ class MainViewModel @Inject constructor(
 
                     _processingState.value = _processingState.value.copy(
                         progressPercent = if (generateAi) 90 else 65,
-                        currentStep = "Building Fast PBR Maps..."
+                        currentStep = if (isSeamless) "Synthesizing Seamless Fast PBR Maps..." else "Building Fast PBR Maps..."
                     )
 
                     fastResultState = buildPbrMapSet(
@@ -406,7 +423,10 @@ class MainViewModel @Inject constructor(
                         baseDepthMap = fastHeight,
                         highPassLum = highPassLum,
                         targetResolution = targetResolution,
-                        settings = settings
+                        settings = settings,
+                        isSeamless = isSeamless,
+                        seamlessBlendMargin = blendMargin,
+                        exclusionMaskBitmap = _imageState.value.exclusionMaskBitmap
                     )
                 }
 
@@ -446,12 +466,35 @@ class MainViewModel @Inject constructor(
         baseDepthMap: FloatArray?,
         highPassLum: FloatArray,
         targetResolution: Int,
-        settings: AppSettings
+        settings: AppSettings,
+        isSeamless: Boolean = false,
+        seamlessBlendMargin: Float = 0.20f,
+        exclusionMaskBitmap: Bitmap? = null
     ): GeneratedMapState {
-        val heightBitmap = mapProcessor.floatMapToGrayscaleBitmap(heightMap, targetResolution, targetResolution)
+        // Apply blemish exclusion mask to height map if present
+        val maskedHeightMap = if (exclusionMaskBitmap != null) {
+            mapProcessor.applyExclusionMask(
+                heightMap = heightMap,
+                maskBitmap = exclusionMaskBitmap,
+                width = targetResolution,
+                height = targetResolution
+            )
+        } else {
+            heightMap
+        }
+
+        val workingCropped = if (isSeamless) {
+            mapProcessor.makeSeamlessBitmap(cropped, seamlessBlendMargin)
+        } else cropped
+
+        val workingHeightMap = if (isSeamless) {
+            mapProcessor.makeSeamlessFloatMap(maskedHeightMap, targetResolution, targetResolution, seamlessBlendMargin)
+        } else maskedHeightMap
+
+        val heightBitmap = mapProcessor.floatMapToGrayscaleBitmap(workingHeightMap, targetResolution, targetResolution)
         val initialNormalStrength = 1.5f
         val normalPixels = mapProcessor.generateNormalMap(
-            heightMap = heightMap,
+            heightMap = workingHeightMap,
             width = targetResolution,
             height = targetResolution,
             strength = initialNormalStrength,
@@ -463,18 +506,22 @@ class MainViewModel @Inject constructor(
             scale4Weight = settings.normalScale4
         )
         val normalBitmap = mapProcessor.pixelArrayToBitmap(normalPixels, targetResolution, targetResolution)
-        val roughnessMap = mapProcessor.generateRoughnessMap(cropped, 0.5f, 1.0f)
+        val roughnessMap = mapProcessor.generateRoughnessMap(workingCropped, 0.5f, 1.0f)
         val roughnessBitmap = mapProcessor.floatMapToGrayscaleBitmap(roughnessMap, targetResolution, targetResolution)
-        val aoMap = mapProcessor.generateAoMap(heightMap, targetResolution, targetResolution, 12, 1.5f)
+        val aoMap = mapProcessor.generateAoMap(workingHeightMap, targetResolution, targetResolution, 12, 1.5f)
         val aoBitmap = mapProcessor.floatMapToGrayscaleBitmap(aoMap, targetResolution, targetResolution)
-        val curvatureMap = mapProcessor.generateCurvatureMap(heightMap, targetResolution, targetResolution, 1.5f)
+        val curvatureMap = mapProcessor.generateCurvatureMap(workingHeightMap, targetResolution, targetResolution, 1.5f)
         val curvatureBitmap = mapProcessor.floatMapToGrayscaleBitmap(curvatureMap, targetResolution, targetResolution)
-        val metallicMap = mapProcessor.generateMetallicMap(cropped, 0.85f, 1.0f)
+        val metallicMap = mapProcessor.generateMetallicMap(workingCropped, 0.85f, 1.0f)
         val metallicBitmap = mapProcessor.floatMapToGrayscaleBitmap(metallicMap, targetResolution, targetResolution)
-        val albedoPixels = mapProcessor.generateAlbedoMap(cropped, 0.7f)
+        val albedoPixels = mapProcessor.generateAlbedoMap(workingCropped, 0.7f)
         val albedoBitmap = mapProcessor.pixelArrayToBitmap(albedoPixels, targetResolution, targetResolution)
         val noiseMap = mapProcessor.generatePerlinNoiseMap(targetResolution, targetResolution, 8.0f, 4, 1.0f)
         val noiseBitmap = mapProcessor.floatMapToGrayscaleBitmap(noiseMap, targetResolution, targetResolution)
+
+        // Real seam continuity calculation & 2x2 tiled repeat preview
+        val seamAnalysis = mapProcessor.analyzeSeamContinuity(workingCropped)
+        val tiled2x2 = mapProcessor.generate2x2TiledBitmap(workingCropped)
 
         return GeneratedMapState(
             resolution = targetResolution,
@@ -488,7 +535,7 @@ class MainViewModel @Inject constructor(
             noiseBitmap = noiseBitmap,
             baseDepthMap = baseDepthMap,
             highPassLuminance = highPassLum,
-            heightMap = heightMap,
+            heightMap = workingHeightMap,
             normalPixels = normalPixels,
             roughnessMap = roughnessMap,
             aoMap = aoMap,
@@ -498,8 +545,59 @@ class MainViewModel @Inject constructor(
             noiseMap = noiseMap,
             detailBoost = 0.5f,
             normalStrength = initialNormalStrength,
-            invertHeight = false
+            invertHeight = false,
+            isSeamless = isSeamless,
+            seamAnalysis = seamAnalysis,
+            tiled2x2Bitmap = tiled2x2,
+            show2x2Tiled = false,
+            seamlessBlendMargin = seamlessBlendMargin,
+            exclusionMaskBitmap = exclusionMaskBitmap
         )
+    }
+
+    fun toggle2x2TiledView() {
+        val current = _generatedState.value ?: return
+        val updated = current.copy(show2x2Tiled = !current.show2x2Tiled)
+        _generatedState.value = updated
+        if (_activeVariant.value == GenerationMode.AI_DEPTH) _aiDepthState.value = updated
+        if (_activeVariant.value == GenerationMode.FAST) _fastState.value = updated
+    }
+
+    fun applySeamlessTiling(enabled: Boolean, blendMargin: Float = 0.20f) {
+        val current = _generatedState.value ?: return
+        val cropped = _imageState.value.croppedBitmap ?: return
+        val res = current.resolution
+        val settings = appSettings.value
+
+        viewModelScope.launch {
+            _processingState.value = ProcessingState(
+                isProcessing = true,
+                progressPercent = 40,
+                currentStep = if (enabled) "Synthesizing Seamless Edges..." else "Restoring Raw Edges..."
+            )
+            try {
+                val baseH = current.baseDepthMap ?: current.heightMap ?: FloatArray(res * res) { 0.5f }
+                val updated = buildPbrMapSet(
+                    cropped = cropped,
+                    heightMap = baseH,
+                    baseDepthMap = current.baseDepthMap,
+                    highPassLum = current.highPassLuminance ?: FloatArray(res * res),
+                    targetResolution = res,
+                    settings = settings,
+                    isSeamless = enabled,
+                    seamlessBlendMargin = blendMargin
+                )
+                _generatedState.value = updated
+                if (_activeVariant.value == GenerationMode.AI_DEPTH) _aiDepthState.value = updated
+                if (_activeVariant.value == GenerationMode.FAST) _fastState.value = updated
+                _processingState.value = ProcessingState(isProcessing = false)
+            } catch (e: Exception) {
+                _processingState.value = ProcessingState(
+                    isProcessing = false,
+                    errorMessage = "Seamless adjustment error: ${e.localizedMessage ?: "Unknown error"}"
+                )
+            }
+        }
     }
 
     fun cancelGeneration() {
@@ -526,8 +624,19 @@ class MainViewModel @Inject constructor(
                 height = res
             )
 
+            val maskedHeight = if (current.exclusionMaskBitmap != null) {
+                mapProcessor.applyExclusionMask(
+                    heightMap = blendedHeight,
+                    maskBitmap = current.exclusionMaskBitmap,
+                    width = res,
+                    height = res
+                )
+            } else {
+                blendedHeight
+            }
+
             val normalPixels = mapProcessor.generateNormalMap(
-                heightMap = blendedHeight,
+                heightMap = maskedHeight,
                 width = res,
                 height = res,
                 strength = current.normalStrength,
@@ -539,12 +648,12 @@ class MainViewModel @Inject constructor(
                 scale4Weight = appSettings.value.normalScale4
             )
 
-            val heightBitmap = mapProcessor.floatMapToGrayscaleBitmap(blendedHeight, res, res)
+            val heightBitmap = mapProcessor.floatMapToGrayscaleBitmap(maskedHeight, res, res)
             val normalBitmap = mapProcessor.pixelArrayToBitmap(normalPixels, res, res)
 
             _generatedState.value = current.copy(
                 detailBoost = boost,
-                heightMap = blendedHeight,
+                heightMap = maskedHeight,
                 normalPixels = normalPixels,
                 heightBitmap = heightBitmap,
                 normalBitmap = normalBitmap

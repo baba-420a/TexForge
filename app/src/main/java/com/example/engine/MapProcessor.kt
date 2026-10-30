@@ -148,4 +148,71 @@ interface MapProcessor {
         width: Int,
         height: Int
     ): Bitmap
+
+    /**
+     * Synthesizes a seamless tileable Bitmap using cross-offset boundary blending.
+     */
+    suspend fun makeSeamlessBitmap(
+        source: Bitmap,
+        blendMarginRatio: Float = 0.20f
+    ): Bitmap
+
+    /**
+     * Synthesizes a seamless tileable grayscale FloatArray map.
+     */
+    suspend fun makeSeamlessFloatMap(
+        map: FloatArray,
+        width: Int,
+        height: Int,
+        blendMarginRatio: Float = 0.20f
+    ): FloatArray
+
+    /**
+     * Measures true seam discontinuity and continuity metrics between opposite borders.
+     */
+    suspend fun analyzeSeamContinuity(
+        source: Bitmap
+    ): SeamAnalysisResult
+
+    /**
+     * Applies a blemish exclusion mask to a height map, inpainting masked regions via
+     * harmonic Dirichlet diffusion from boundary values to prevent deep cavity depth warping.
+     */
+    suspend fun applyExclusionMask(
+        heightMap: FloatArray,
+        maskBitmap: Bitmap?,
+        width: Int,
+        height: Int,
+        iterations: Int = 24
+    ): FloatArray
+
+    /**
+     * Inpaints masked areas of a height map using iterative harmonic relaxation.
+     */
+    suspend fun inpaintHeightMap(
+        heightMap: FloatArray,
+        mask: BooleanArray,
+        width: Int,
+        height: Int,
+        iterations: Int = 24
+    ): FloatArray
+
+    /**
+     * Creates a 2x2 repeat composite Bitmap for instant visual tiling inspection.
+     */
+    suspend fun generate2x2TiledBitmap(
+        source: Bitmap
+    ): Bitmap
 }
+
+/**
+ * Real analytical metrics for texture seam discontinuity and boundary continuity.
+ */
+data class SeamAnalysisResult(
+    val seamDiscontinuityScore: Float,
+    val continuityPercent: Float,
+    val horizontalSeamError: Float,
+    val verticalSeamError: Float,
+    val maxEdgeDiscontinuity: Float,
+    val isSeamless: Boolean
+)

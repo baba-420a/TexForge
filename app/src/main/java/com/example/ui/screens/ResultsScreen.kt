@@ -40,7 +40,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.FilterVintage
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.Layers
+import androidx.compose.material.icons.filled.Output
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.Tune
@@ -59,6 +59,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -89,6 +91,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.preferences.GenerationMode
 import com.example.data.preferences.NormalFormat
 import com.example.ui.GeneratedMapState
+import com.example.ui.components.ExportBottomSheet
 import kotlinx.coroutines.launch
 
 enum class SelectedMapType(val title: String, val shortLabel: String, val technicalDescription: String) {
@@ -123,12 +126,15 @@ fun ResultsScreen(
     onAlbedoChange: (Float) -> Unit,
     onNoiseChange: (Float, Int, Float, Float) -> Unit,
     onSwitchVariant: (GenerationMode) -> Unit = {},
+    onToggle2x2Tiled: () -> Unit = {},
+    onApplySeamless: (Boolean, Float) -> Unit = { _, _ -> },
     onBackToCreate: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var show3dPreview by remember { mutableStateOf(false) }
     var isCompareMode by remember { mutableStateOf(activeVariant == GenerationMode.COMPARE_BOTH) }
     var showAdjustSheet by remember { mutableStateOf(false) }
+    var showExportSheet by remember { mutableStateOf(false) }
     var selectedMap by remember { mutableStateOf(SelectedMapType.NORMAL) }
 
     var scale by remember { mutableFloatStateOf(1f) }
@@ -345,6 +351,8 @@ fun ResultsScreen(
                     scale = scale,
                     offsetX = offsetX,
                     offsetY = offsetY,
+                    show2x2Tiled = generatedState.show2x2Tiled,
+                    onToggle2x2Tiled = onToggle2x2Tiled,
                     onTransformChange = { s, x, y ->
                         scale = s
                         offsetX = x
@@ -430,19 +438,40 @@ fun ResultsScreen(
                                 Icon(
                                     imageVector = Icons.Default.FilterVintage,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
+                                    tint = if (generatedState.isSeamless) Color(0xFF3DD68C) else MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
                         }
                         Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "Seamless Tiling",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Surface(
+                                    shape = RoundedCornerShape(4.dp),
+                                    color = if (generatedState.isSeamless) Color(0xFF3DD68C).copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceContainerHighest
+                                ) {
+                                    Text(
+                                        text = if (generatedState.isSeamless) "Seamless" else "Raw Edges",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.SemiBold),
+                                        color = if (generatedState.isSeamless) Color(0xFF3DD68C) else MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            val seam = generatedState.seamAnalysis
                             Text(
-                                text = "Seamless Tiling",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Text(
-                                text = "Border wrap verified (UV 1.0)",
+                                text = if (seam != null) {
+                                    "Continuity: ${"%.1f".format(seam.continuityPercent)}% • Seam RMS: ${"%.3f".format(seam.seamDiscontinuityScore)}"
+                                } else {
+                                    "Border wrap verified (UV 1.0)"
+                                },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -450,14 +479,20 @@ fun ResultsScreen(
                     }
 
                     Surface(
-                        shape = RoundedCornerShape(6.dp),
-                        color = MaterialTheme.colorScheme.surfaceContainer
+                        shape = RoundedCornerShape(8.dp),
+                        color = if (generatedState.show2x2Tiled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
+                        border = if (generatedState.show2x2Tiled) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null,
+                        modifier = Modifier
+                            .clickable { onToggle2x2Tiled() }
+                            .testTag("btn_repeat_2x2")
                     ) {
                         Text(
-                            text = "Repeat 2×2",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            text = if (generatedState.show2x2Tiled) "Repeat 2×2 (ON)" else "Repeat 2×2",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontWeight = if (generatedState.show2x2Tiled) FontWeight.SemiBold else FontWeight.Medium
+                            ),
+                            color = if (generatedState.show2x2Tiled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                         )
                     }
                 }
@@ -592,34 +627,35 @@ fun ResultsScreen(
                     )
                 }
 
-                // Secondary Export Button (Coming in Phase 7)
+                // Primary Export Button
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = MaterialTheme.colorScheme.surfaceContainer,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary),
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp)
                 ) {
                     Button(
-                        onClick = { /* Export planned in Phase 7 */ },
-                        enabled = false,
+                        onClick = { showExportSheet = true },
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(
-                            disabledContainerColor = Color.Transparent,
-                            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.primary
                         ),
                         modifier = Modifier.fillMaxSize().testTag("btn_export")
                     ) {
                         Icon(
                             imageVector = Icons.Default.Download,
                             contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Export (Coming in Phase 7)",
-                            style = MaterialTheme.typography.labelLarge
+                            text = "Export Material PBR Maps",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -643,7 +679,16 @@ fun ResultsScreen(
             onMetallicChange = onMetallicChange,
             onAlbedoChange = onAlbedoChange,
             onNoiseChange = onNoiseChange,
+            onApplySeamless = onApplySeamless,
             onDismiss = { showAdjustSheet = false }
+        )
+    }
+
+    // Export Material Modal Bottom Sheet
+    if (showExportSheet) {
+        ExportBottomSheet(
+            generatedState = generatedState,
+            onDismiss = { showExportSheet = false }
         )
     }
 }
@@ -717,6 +762,8 @@ private fun SingleMapCard(
     scale: Float,
     offsetX: Float,
     offsetY: Float,
+    show2x2Tiled: Boolean = false,
+    onToggle2x2Tiled: () -> Unit = {},
     onTransformChange: (Float, Float, Float) -> Unit,
     onToggleCompare: () -> Unit
 ) {
@@ -746,22 +793,74 @@ private fun SingleMapCard(
             contentAlignment = Alignment.Center
         ) {
             if (bitmap != null) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = selectedMap.title,
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer {
-                            scaleX = scale
-                            scaleY = scale
-                            translationX = offsetX
-                            translationY = offsetY
+                if (show2x2Tiled) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offsetX
+                                translationY = offsetY
+                            }
+                    ) {
+                        Column(modifier = Modifier.fillMaxSize()) {
+                            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillBounds,
+                                    modifier = Modifier.weight(1f).fillMaxHeight()
+                                )
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillBounds,
+                                    modifier = Modifier.weight(1f).fillMaxHeight()
+                                )
+                            }
+                            Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillBounds,
+                                    modifier = Modifier.weight(1f).fillMaxHeight()
+                                )
+                                Image(
+                                    bitmap = bitmap.asImageBitmap(),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillBounds,
+                                    modifier = Modifier.weight(1f).fillMaxHeight()
+                                )
+                            }
                         }
-                )
+                        // Subtle seam alignment crosshair overlay
+                        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                            val midX = size.width / 2f
+                            val midY = size.height / 2f
+                            val lineColor = Color(0x665B8CFF)
+                            drawLine(color = lineColor, start = Offset(midX, 0f), end = Offset(midX, size.height), strokeWidth = 1.5f)
+                            drawLine(color = lineColor, start = Offset(0f, midY), end = Offset(size.width, midY), strokeWidth = 1.5f)
+                        }
+                    }
+                } else {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = selectedMap.title,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offsetX
+                                translationY = offsetY
+                            }
+                    )
+                }
             }
 
-            // Top HUD Chip: Channel Name & Specs
+            // Top HUD Chip: Channel Name & Specs + 2x2 Toggle
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -785,11 +884,25 @@ private fun SingleMapCard(
                                 .background(MaterialTheme.colorScheme.primary, CircleShape)
                         )
                         Text(
-                            text = selectedMap.technicalDescription,
+                            text = if (show2x2Tiled) "${selectedMap.shortLabel} • 2×2 Tiled Repeat" else selectedMap.technicalDescription,
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     }
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (show2x2Tiled) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.85f),
+                    border = BorderStroke(1.dp, if (show2x2Tiled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.clickable { onToggle2x2Tiled() }.testTag("viewport_repeat_toggle")
+                ) {
+                    Text(
+                        text = if (show2x2Tiled) "2×2 View" else "1×1",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.SemiBold),
+                        color = if (show2x2Tiled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                    )
                 }
             }
 
@@ -832,7 +945,7 @@ private fun SingleMapCard(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Layers,
+                            imageVector = Icons.Default.Output,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(14.dp)
@@ -1082,9 +1195,11 @@ private fun AdjustBottomSheet(
     onMetallicChange: (Float, Float) -> Unit,
     onAlbedoChange: (Float) -> Unit,
     onNoiseChange: (Float, Int, Float, Float) -> Unit,
+    onApplySeamless: (Boolean, Float) -> Unit = { _, _ -> },
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var seamlessMargin by remember { mutableFloatStateOf(generatedState.seamlessBlendMargin) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1247,6 +1362,73 @@ private fun AdjustBottomSheet(
                 onValueChange = onAlbedoChange,
                 readout = "%.2f".format(generatedState.deLightStrength)
             )
+
+            // Seamless Tiling & Border Synthesis (Phase 5)
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Seamless Synthesis",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Cross-border dual-axis edge blending",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        Switch(
+                            checked = generatedState.isSeamless,
+                            onCheckedChange = { enabled ->
+                                onApplySeamless(enabled, seamlessMargin)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                                checkedTrackColor = MaterialTheme.colorScheme.primary,
+                                uncheckedThumbColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                uncheckedTrackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                            )
+                        )
+                    }
+
+                    if (generatedState.isSeamless) {
+                        SliderRow(
+                            title = "Edge Blend Margin",
+                            value = seamlessMargin,
+                            valueRange = 0.08f..0.35f,
+                            onValueChange = { seamlessMargin = it },
+                            readout = "${(seamlessMargin * 100).toInt()}%"
+                        )
+
+                        Button(
+                            onClick = { onApplySeamless(true, seamlessMargin) },
+                            shape = RoundedCornerShape(8.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(40.dp)
+                        ) {
+                            Text("Re-synthesize Seamless Borders", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
         }
